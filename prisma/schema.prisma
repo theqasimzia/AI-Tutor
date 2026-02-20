@@ -1,0 +1,69 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// User (Parent or Admin)
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String   // Hashed password
+  name      String?
+  role      String   @default("PARENT") // PARENT, ADMIN
+  
+  children  Student[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Student (Child Profile)
+model Student {
+  id        String   @id @default(cuid())
+  name      String
+  grade     String?  // e.g., "Year 3", "Year 4"
+  xp        Int      @default(0)
+  avatar    String?  // URL to avatar image
+  
+  parentId  String
+  parent    User     @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  
+  progress  LessonProgress[]
+  achievements Achievement[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Progress Tracking
+model LessonProgress {
+  id        String   @id @default(cuid())
+  lessonId  String
+  status    String   @default("LOCKED") // LOCKED, IN_PROGRESS, COMPLETED
+  score     Int      @default(0)
+  
+  studentId String
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  
+  completedAt DateTime?
+  updatedAt   DateTime @updatedAt
+
+  @@unique([studentId, lessonId])
+}
+
+// Gamification - Achievements Unlocked
+model Achievement {
+  id            String   @id @default(cuid())
+  achievementId String   // ID of the achievement (e.g., "first-lesson")
+  unlockedAt    DateTime @default(now())
+  
+  studentId     String
+  student       Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, achievementId])
+}

@@ -1,0 +1,46 @@
+"use client"
+
+import * as React from "react"
+import { cn } from "@/lib/utils"
+
+const Switch = React.forwardRef<
+    HTMLButtonElement,
+    React.ButtonHTMLAttributes<HTMLButtonElement>
+>(({ className, ...props }, ref) => {
+    const [checked, setChecked] = React.useState(props.defaultChecked || false)
+    const isControlled = props.checked !== undefined
+    const state = isControlled ? props.checked : checked
+
+    const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+        if (!isControlled) {
+            setChecked((prev) => !prev)
+        }
+        props.onClick?.(e)
+    }
+
+    return (
+        <button
+            type="button"
+            role="switch"
+            aria-checked={state}
+            data-state={state ? "checked" : "unchecked"}
+            ref={ref}
+            onClick={handleClick}
+            className={cn(
+                "peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=unchecked]:bg-input",
+                className
+            )}
+            {...props}
+        >
+            <span
+                data-state={state ? "checked" : "unchecked"}
+                className={cn(
+                    "pointer-events-none block h-5 w-5 rounded-full bg-background shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0"
+                )}
+            />
+        </button>
+    )
+})
+Switch.displayName = "Switch"
+
+export { Switch }
