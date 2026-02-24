@@ -5,7 +5,6 @@ import Link from "next/link"
 import { Play, Star, Clock, CalendarDays, ChevronRight, Zap, Target, BookOpen, Brain, Calculator } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Progress } from "@/components/ui/progress" // Assuming we have this, or I'll implement a simple one
 
 export default function StudentDashboard() {
     return (

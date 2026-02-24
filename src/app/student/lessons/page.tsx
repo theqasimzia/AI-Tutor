@@ -4,7 +4,6 @@ import Link from "next/link"
 import { motion } from "framer-motion"
 import { Play, CheckCircle2, Lock, Clock, BookOpen, Star } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Progress } from "@/components/ui/progress"
 import { curriculum } from "@/lib/curriculum" // Assuming this exists from previous steps
 
 export default function MyCurriculumPage() {

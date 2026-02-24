@@ -2,7 +2,6 @@
 
 import { motion } from "framer-motion"
 import { Trophy, Star, Shield, Zap, Target, Award, Crown } from "lucide-react"
-import { Progress } from "@/components/ui/progress"
 import { Card, CardContent } from "@/components/ui/card"
 
 export default function AchievementsPage() {
@@ -78,8 +77,8 @@ export default function AchievementsPage() {
                     {[1, 2, 3, 4, 5].map((rank) => (
                         <div key={rank} className={`flex items-center gap-4 p-4 border-b border-slate-100 last:border-0 hover:bg-slate-50 ${rank === 1 ? 'bg-amber-50/50' : ''}`}>
                             <div className={`h-8 w-8 rounded-full flex items-center justify-center font-bold ${rank === 1 ? 'bg-amber-100 text-amber-700' :
-                                    rank === 2 ? 'bg-slate-200 text-slate-700' :
-                                        rank === 3 ? 'bg-orange-100 text-orange-700' : 'text-slate-500'
+                                rank === 2 ? 'bg-slate-200 text-slate-700' :
+                                    rank === 3 ? 'bg-orange-100 text-orange-700' : 'text-slate-500'
                                 }`}>
                                 {rank}
                             </div>
