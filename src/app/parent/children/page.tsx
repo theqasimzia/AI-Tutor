@@ -11,6 +11,7 @@ import { BookOpen, Trophy, Clock, Target, Plus } from "lucide-react"
 import { getStudentsByParentId } from "@/lib/queries/student"
 import { getChildDetailedProgress } from "@/lib/queries/parent"
 import { addChild } from "@/app/actions/parent-actions"
+import { toast } from "sonner"
 
 const subjectColorMap: Record<string, string> = {
     blue: "bg-blue-500",
@@ -29,6 +30,7 @@ export default function ChildrenPage() {
     const [showAddForm, setShowAddForm] = useState(false)
     const [newChildName, setNewChildName] = useState("")
     const [newChildGrade, setNewChildGrade] = useState("Year 3")
+    const [adding, setAdding] = useState(false)
 
     useEffect(() => {
         if (!session?.user?.id) return
@@ -46,11 +48,19 @@ export default function ChildrenPage() {
 
     const handleAddChild = async () => {
         if (!session?.user?.id || !newChildName.trim()) return
-        await addChild(session.user.id, { name: newChildName.trim(), grade: newChildGrade })
-        const kids = await getStudentsByParentId(session.user.id)
-        setChildren(kids)
-        setShowAddForm(false)
-        setNewChildName("")
+        setAdding(true)
+        try {
+            await addChild(session.user.id, { name: newChildName.trim(), grade: newChildGrade })
+            const kids = await getStudentsByParentId(session.user.id)
+            setChildren(kids)
+            setShowAddForm(false)
+            setNewChildName("")
+            toast.success("Child added successfully")
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Failed to add child")
+        } finally {
+            setAdding(false)
+        }
     }
 
     if (loading) {
@@ -91,8 +101,10 @@ export default function ChildrenPage() {
                             </div>
                         </div>
                         <div className="flex gap-2">
-                            <Button onClick={handleAddChild}>Add</Button>
-                            <Button variant="outline" onClick={() => setShowAddForm(false)}>Cancel</Button>
+                            <Button onClick={handleAddChild} disabled={adding}>
+                                {adding ? "Adding..." : "Add"}
+                            </Button>
+                            <Button variant="outline" onClick={() => setShowAddForm(false)} disabled={adding}>Cancel</Button>
                         </div>
                     </CardContent>
                 </Card>

@@ -8,6 +8,7 @@ import { useState, useEffect } from "react"
 
 import { Button } from "@/components/ui/button"
 import { VoiceTutor } from "@/components/voice-tutor"
+import { toast } from "sonner"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -108,8 +109,8 @@ export default function LessonPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuItem onClick={() => alert("Report Issue")}>Report Issue</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => alert("View Transcript")}>View Transcript History</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => toast.info("Report issue feature coming soon!")}>Report Issue</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => toast.info("Transcript history coming soon!")}>View Transcript History</DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem className="text-red-600" onClick={endLesson}>Exit Lesson</DropdownMenuItem>
                         </DropdownMenuContent>

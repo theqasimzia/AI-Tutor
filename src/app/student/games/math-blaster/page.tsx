@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Calculator, Zap, Play, RotateCcw, Trophy } from "lucide-react"
 import { useStudent } from "@/lib/student-context"
 import { submitGameScore } from "@/app/actions/student-actions"
+import { toast } from "sonner"
 
 type Asteroid = {
     id: number
@@ -125,6 +126,8 @@ export default function MathBlasterPage() {
     useEffect(() => {
         if (gameState === "gameover" && score > 0 && selectedStudent?.id) {
             submitGameScore(selectedStudent.id, "math-blaster", score, score)
+                .then(() => toast.success(`Score saved! +${score} XP earned`))
+                .catch(() => toast.error("Failed to save score"))
         }
     }, [gameState])
 

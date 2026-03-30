@@ -3,6 +3,7 @@ import { Outfit } from "next/font/google";
 import "./globals.css";
 import { Navbar } from "@/components/navbar";
 import { SessionProvider } from "@/components/providers/session-provider";
+import { Toaster } from "sonner";
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -28,6 +29,7 @@ export default function RootLayout({
           <main className="min-h-screen flex flex-col">
             {children}
           </main>
+          <Toaster richColors position="top-right" />
         </SessionProvider>
       </body>
     </html>

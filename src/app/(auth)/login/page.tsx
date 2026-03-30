@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { signIn } from "next-auth/react"
 import { GraduationCap } from "lucide-react"
+import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -53,11 +54,13 @@ export default function LoginPage() {
 
             if (result?.error) {
                 setError("Invalid email or password. Please try again.")
+                toast.error("Invalid email or password")
                 setLoading(false)
                 return
             }
 
             if (result?.ok) {
+                toast.success("Welcome back!")
                 if (role === "student") {
                     router.push("/student/dashboard")
                 } else {
@@ -67,6 +70,7 @@ export default function LoginPage() {
             }
         } catch {
             setError("Something went wrong. Please try again.")
+            toast.error("Something went wrong. Please try again.")
             setLoading(false)
         }
     }

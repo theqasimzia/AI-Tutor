@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { History, Check, X, ShieldQuestion, ArrowRight } from "lucide-react"
 import { useStudent } from "@/lib/student-context"
 import { submitGameScore } from "@/app/actions/student-actions"
+import { toast } from "sonner"
 
 // Mock Questions
 const timelineData = [
@@ -62,6 +63,8 @@ export default function HistoryHeroPage() {
             setScore(s => s + 100)
             if (selectedStudent?.id) {
                 submitGameScore(selectedStudent.id, "history-hero", 100, 100)
+                    .then(() => toast.success("Score saved! +100 XP"))
+                    .catch(() => toast.error("Failed to save score"))
             }
         }
 

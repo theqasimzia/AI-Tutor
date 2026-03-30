@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
+import { toast } from "sonner"
 
 // Types for Speech Recognition
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -106,7 +107,7 @@ export function VoiceTutor({ initialGreeting = "Hello! I'm your AI Tutor. What w
 
     const toggleListening = () => {
         if (!recognitionRef.current) {
-            alert("Speech recognition not supported in this browser. Please try Chrome.");
+            toast.error("Speech recognition not supported in this browser. Please try Chrome.");
             return;
         }
 

@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { User, Lock, Bell, Sparkles } from "lucide-react"
 import { useStudent } from "@/lib/student-context"
 import { updateStudentProfile } from "@/app/actions/student-actions"
+import { toast } from "sonner"
 
 export default function ProfilePage() {
     const { selectedStudent } = useStudent()
@@ -25,9 +26,15 @@ export default function ProfilePage() {
     const handleSave = async () => {
         if (!selectedStudent?.id) return
         setSaving(true)
-        const fullName = name.trim() || studentName
-        await updateStudentProfile(selectedStudent.id, { name: fullName })
-        setSaving(false)
+        try {
+            const fullName = name.trim() || studentName
+            await updateStudentProfile(selectedStudent.id, { name: fullName })
+            toast.success("Profile updated successfully")
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Failed to update profile")
+        } finally {
+            setSaving(false)
+        }
     }
 
     return (

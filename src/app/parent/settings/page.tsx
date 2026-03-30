@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { updateParentProfile } from "@/app/actions/parent-actions"
+import { toast } from "sonner"
 
 export default function SettingsPage() {
     const { data: session } = useSession()
@@ -18,8 +19,14 @@ export default function SettingsPage() {
     const handleSave = async () => {
         if (!session?.user?.id) return
         setSaving(true)
-        await updateParentProfile(session.user.id, { name: name || undefined, email: email || undefined })
-        setSaving(false)
+        try {
+            await updateParentProfile(session.user.id, { name: name || undefined, email: email || undefined })
+            toast.success("Settings saved successfully")
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Failed to save settings")
+        } finally {
+            setSaving(false)
+        }
     }
 
     return (

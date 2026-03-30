@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { getAllUsers } from "@/lib/queries/admin"
 import { deleteUser, updateUserRole } from "@/app/actions/admin-actions"
+import { toast } from "sonner"
 
 type UserData = Awaited<ReturnType<typeof getAllUsers>>[number]
 
@@ -40,13 +41,23 @@ export default function UsersPage() {
 
     const handleDelete = async (userId: string) => {
         if (!confirm("Are you sure you want to delete this user?")) return
-        await deleteUser(userId)
-        fetchUsers(search)
+        try {
+            await deleteUser(userId)
+            toast.success("User deleted successfully")
+            fetchUsers(search)
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Failed to delete user")
+        }
     }
 
     const handleRoleChange = async (userId: string, newRole: string) => {
-        await updateUserRole(userId, newRole)
-        fetchUsers(search)
+        try {
+            await updateUserRole(userId, newRole)
+            toast.success(`User role updated to ${newRole}`)
+            fetchUsers(search)
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Failed to update user role")
+        }
     }
 
     return (

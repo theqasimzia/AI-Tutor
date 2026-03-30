@@ -15,6 +15,7 @@ import { registerParent } from "@/app/actions/auth-actions"
 import { useRouter } from "next/navigation"
 import { signIn } from "next-auth/react"
 import { signupSchema } from "@/lib/validations"
+import { toast } from "sonner"
 
 export default function ParentSignupPage() {
     const router = useRouter()
@@ -140,6 +141,7 @@ export default function ParentSignupPage() {
         try {
             const result = await registerParent(formData)
             if (result.success) {
+                toast.success("Account created! Signing you in...")
                 const signInResult = await signIn("credentials", {
                     email: formData.email,
                     password: formData.password,
@@ -155,10 +157,13 @@ export default function ParentSignupPage() {
                 router.refresh()
             } else {
                 setErrorMessage(result.message)
+                toast.error(result.message)
             }
         } catch (error) {
             console.error(error)
-            setErrorMessage("An error occurred. Please try again.")
+            const msg = "An error occurred. Please try again."
+            setErrorMessage(msg)
+            toast.error(msg)
         } finally {
             setIsLoading(false)
         }

@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { registerParent } from "@/app/actions/auth-actions"
 import { signupSchema } from "@/lib/validations"
+import { toast } from "sonner"
 
 export default function SignupPage() {
     const router = useRouter()
@@ -77,9 +78,12 @@ export default function SignupPage() {
 
             if (!result.success) {
                 setError(result.message)
+                toast.error(result.message)
                 setLoading(false)
                 return
             }
+
+            toast.success("Account created! Signing you in...")
 
             const signInResult = await signIn("credentials", {
                 email,
@@ -96,6 +100,7 @@ export default function SignupPage() {
             router.refresh()
         } catch {
             setError("An error occurred. Please try again.")
+            toast.error("An error occurred. Please try again.")
             setLoading(false)
         }
     }

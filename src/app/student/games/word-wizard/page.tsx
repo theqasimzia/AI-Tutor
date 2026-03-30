@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Brain, Star, Wand2, RefreshCw, RotateCcw } from "lucide-react"
 import { useStudent } from "@/lib/student-context"
 import { submitGameScore } from "@/app/actions/student-actions"
+import { toast } from "sonner"
 
 // Mock Word List
 const words = [
@@ -54,6 +55,8 @@ export default function WordWizardPage() {
                 setScore(s => s + 50)
                 if (selectedStudent?.id) {
                     submitGameScore(selectedStudent.id, "word-wizard", 50, 50)
+                        .then(() => toast.success("Score saved! +50 XP"))
+                        .catch(() => toast.error("Failed to save score"))
                 }
             } else {
                 setTimeout(() => {

@@ -107,6 +107,12 @@ export default function AchievementsPage() {
             {/* Badges Grid */}
             <section>
                 <h2 className="text-2xl font-bold text-slate-800 mb-6">Badges & Medals</h2>
+                {badgeCount === 0 && (
+                    <div className="text-center p-6 mb-4 bg-violet-50 rounded-2xl border border-violet-100 text-violet-700">
+                        <p className="font-semibold">No badges earned yet!</p>
+                        <p className="text-sm text-violet-500 mt-1">Complete lessons and challenges to unlock badges and medals.</p>
+                    </div>
+                )}
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
                     {allBadges.map((badge, i) => (
                         <BadgeCard key={i} icon={badge.icon} title={badge.title} description={badge.description} achieved={badge.achieved} />

@@ -1,6 +1,3 @@
-
-import { Navbar } from "@/components/navbar";
-
 export default function PrivacyPage() {
     return (
         <div className="container mx-auto px-4 py-8">
@@ -14,7 +11,7 @@ export default function PrivacyPage() {
             <ul className="list-disc pl-5 mb-4 space-y-2">
                 <li>Data Collection: We collecting minimal data required for educational purposes.</li>
                 <li>Voice Data: Voice inputs are processed for the sole purpose of the tutoring session and are not stored permanently without consent.</li>
-                <li>Parental Control: Parents have full access to their child's data and can request deletion at any time.</li>
+                <li>Parental Control: Parents have full access to their child&apos;s data and can request deletion at any time.</li>
             </ul>
         </div>
     )
