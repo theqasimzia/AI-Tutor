@@ -1,3 +1,5 @@
+"use server"
+
 import prisma from "@/lib/prisma"
 import { LessonStatus } from "@prisma/client"
 
@@ -94,6 +96,51 @@ export async function getStudentAchievements(studentId: string) {
     where: { studentId },
     orderBy: { unlockedAt: "desc" },
   })
+}
+
+export async function getSuggestedLessons(studentId: string) {
+  const completedIds = (
+    await prisma.lessonProgress.findMany({
+      where: { studentId, status: LessonStatus.COMPLETED },
+      select: { lessonId: true },
+    })
+  ).map((p) => p.lessonId)
+
+  const inProgressIds = (
+    await prisma.lessonProgress.findMany({
+      where: { studentId, status: LessonStatus.IN_PROGRESS },
+      select: { lessonId: true },
+    })
+  ).map((p) => p.lessonId)
+
+  const inProgress = inProgressIds.length > 0
+    ? await prisma.lesson.findMany({
+        where: { id: { in: inProgressIds } },
+        include: { module: { include: { subject: true } } },
+        take: 2,
+      })
+    : []
+
+  const notStarted = await prisma.lesson.findMany({
+    where: {
+      id: { notIn: [...completedIds, ...inProgressIds] },
+    },
+    include: { module: { include: { subject: true } } },
+    orderBy: { order: "asc" },
+    take: 3 - inProgress.length,
+  })
+
+  return [...inProgress, ...notStarted].map((l) => ({
+    id: l.id,
+    title: l.title,
+    description: l.description,
+    duration: l.duration,
+    subject: l.module?.subject?.name ?? "General",
+    subjectColor: l.module?.subject?.color ?? "blue",
+    status: inProgressIds.includes(l.id)
+      ? "IN_PROGRESS" as const
+      : "NOT_STARTED" as const,
+  }))
 }
 
 export async function getStudentGameScores(studentId: string) {

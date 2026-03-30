@@ -44,15 +44,21 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL(redirectUrl, request.url))
     }
 
-    // Allow both STUDENT and PARENT roles to access student routes
     if (
       pathname.startsWith("/student") &&
-      role !== "STUDENT" &&
-      role !== "PARENT"
+      role !== "PARENT" &&
+      role !== "ADMIN"
     ) {
       const redirectUrl = roleRedirectMap[role] || "/parent/dashboard"
       return NextResponse.redirect(new URL(redirectUrl, request.url))
     }
+  }
+
+  // Protect lesson pages — require authentication
+  if (pathname.startsWith("/lesson") && !token) {
+    const loginUrl = new URL("/login", request.url)
+    loginUrl.searchParams.set("callbackUrl", pathname)
+    return NextResponse.redirect(loginUrl)
   }
 
   return NextResponse.next()
@@ -63,6 +69,7 @@ export const config = {
     "/student/:path*",
     "/parent/:path*",
     "/admin/:path*",
+    "/lesson/:path*",
     "/login",
     "/signup",
     "/signup/:path*",

@@ -1,9 +1,9 @@
 "use client"
 
 import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { useState } from "react"
-import { signIn } from "next-auth/react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { useState, Suspense } from "react"
+import { signIn, getSession } from "next-auth/react"
 import { GraduationCap } from "lucide-react"
 import { toast } from "sonner"
 
@@ -14,29 +14,33 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { loginSchema } from "@/lib/validations"
 
-export default function LoginPage() {
+const roleRedirectMap: Record<string, string> = {
+    ADMIN: "/admin/dashboard",
+    PARENT: "/parent/dashboard",
+    STUDENT: "/student/dashboard",
+}
+
+function LoginForm() {
     const router = useRouter()
+    const searchParams = useSearchParams()
+    const callbackUrl = searchParams.get("callbackUrl")
+
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 
-    const [studentEmail, setStudentEmail] = useState("")
-    const [studentPassword, setStudentPassword] = useState("")
-    const [parentEmail, setParentEmail] = useState("")
-    const [parentPassword, setParentPassword] = useState("")
+    const [email, setEmail] = useState("")
+    const [password, setPassword] = useState("")
 
-    const handleLogin = async (role: "student" | "parent") => {
+    const handleLogin = async (intent: "student" | "parent" | "admin") => {
         setFieldErrors({})
         setError("")
-
-        const email = role === "student" ? studentEmail : parentEmail
-        const password = role === "student" ? studentPassword : parentPassword
 
         const parsed = loginSchema.safeParse({ email, password })
         if (!parsed.success) {
             const errors: Record<string, string> = {}
             for (const err of parsed.error.issues) {
-                const key = `${role}-${String(err.path[0])}`
+                const key = String(err.path[0])
                 if (!errors[key]) errors[key] = err.message
             }
             setFieldErrors(errors)
@@ -61,10 +65,16 @@ export default function LoginPage() {
 
             if (result?.ok) {
                 toast.success("Welcome back!")
-                if (role === "student") {
+
+                const session = await getSession()
+                const role = session?.user?.role ?? "PARENT"
+
+                if (callbackUrl) {
+                    router.push(callbackUrl)
+                } else if (intent === "student") {
                     router.push("/student/dashboard")
                 } else {
-                    router.push("/parent/dashboard")
+                    router.push(roleRedirectMap[role] || "/parent/dashboard")
                 }
                 router.refresh()
             }
@@ -94,99 +104,81 @@ export default function LoginPage() {
                         {error}
                     </div>
                 )}
-                <Tabs defaultValue="student" className="w-full" onValueChange={() => { setError(""); setFieldErrors({}) }}>
-                    <TabsList className="grid w-full grid-cols-2 mb-4">
+                <Tabs defaultValue="parent" className="w-full" onValueChange={() => { setError(""); setFieldErrors({}) }}>
+                    <TabsList className="grid w-full grid-cols-3 mb-4">
                         <TabsTrigger value="student">Student</TabsTrigger>
                         <TabsTrigger value="parent">Parent</TabsTrigger>
+                        <TabsTrigger value="admin">Admin</TabsTrigger>
                     </TabsList>
 
-                    <TabsContent value="student">
-                        <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleLogin("student") }}>
-                            <div className="space-y-2">
-                                <Label htmlFor="s-email">Parent Email</Label>
-                                <Input
-                                    id="s-email"
-                                    type="email"
-                                    placeholder="parent@example.com"
-                                    required
-                                    value={studentEmail}
-                                    onChange={(e) => setStudentEmail(e.target.value)}
-                                />
-                                {fieldErrors["student-email"] && (
-                                    <p className="text-red-600 text-sm">{fieldErrors["student-email"]}</p>
-                                )}
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="s-password">Password</Label>
-                                <Input
-                                    id="s-password"
-                                    type="password"
-                                    required
-                                    value={studentPassword}
-                                    onChange={(e) => setStudentPassword(e.target.value)}
-                                />
-                                {fieldErrors["student-password"] && (
-                                    <p className="text-red-600 text-sm">{fieldErrors["student-password"]}</p>
-                                )}
-                            </div>
-                            <Button className="w-full" type="submit" disabled={loading}>
-                                {loading ? "Logging in..." : "Login as Student"}
-                            </Button>
-                            <p className="text-xs text-muted-foreground text-center">
-                                Use your parent&apos;s email to access your student dashboard
-                            </p>
-                        </form>
+                    <div className="space-y-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="login-email">Email</Label>
+                            <Input
+                                id="login-email"
+                                type="email"
+                                placeholder="your@email.com"
+                                required
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                            />
+                            {fieldErrors.email && (
+                                <p className="text-red-600 text-sm">{fieldErrors.email}</p>
+                            )}
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="login-password">Password</Label>
+                            <Input
+                                id="login-password"
+                                type="password"
+                                required
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                            />
+                            {fieldErrors.password && (
+                                <p className="text-red-600 text-sm">{fieldErrors.password}</p>
+                            )}
+                        </div>
+                    </div>
+
+                    <TabsContent value="student" className="mt-4">
+                        <Button className="w-full" onClick={() => handleLogin("student")} disabled={loading}>
+                            {loading ? "Logging in..." : "Login as Student"}
+                        </Button>
+                        <p className="text-xs text-muted-foreground text-center mt-2">
+                            Use your parent&apos;s email to access the student dashboard
+                        </p>
                     </TabsContent>
 
-                    <TabsContent value="parent">
-                        <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleLogin("parent") }}>
-                            <div className="space-y-2">
-                                <Label htmlFor="p-email">Parent Email</Label>
-                                <Input
-                                    id="p-email"
-                                    type="email"
-                                    placeholder="parent@example.com"
-                                    required
-                                    value={parentEmail}
-                                    onChange={(e) => setParentEmail(e.target.value)}
-                                />
-                                {fieldErrors["parent-email"] && (
-                                    <p className="text-red-600 text-sm">{fieldErrors["parent-email"]}</p>
-                                )}
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="p-password">Password</Label>
-                                <Input
-                                    id="p-password"
-                                    type="password"
-                                    required
-                                    value={parentPassword}
-                                    onChange={(e) => setParentPassword(e.target.value)}
-                                />
-                                {fieldErrors["parent-password"] && (
-                                    <p className="text-red-600 text-sm">{fieldErrors["parent-password"]}</p>
-                                )}
-                            </div>
-                            <Button className="w-full" type="submit" variant="secondary" disabled={loading}>
-                                {loading ? "Logging in..." : "Login as Parent"}
-                            </Button>
-                        </form>
+                    <TabsContent value="parent" className="mt-4">
+                        <Button className="w-full" variant="secondary" onClick={() => handleLogin("parent")} disabled={loading}>
+                            {loading ? "Logging in..." : "Login as Parent"}
+                        </Button>
+                    </TabsContent>
+
+                    <TabsContent value="admin" className="mt-4">
+                        <Button className="w-full bg-slate-900 hover:bg-slate-800 text-white" onClick={() => handleLogin("admin")} disabled={loading}>
+                            {loading ? "Logging in..." : "Login as Admin"}
+                        </Button>
                     </TabsContent>
                 </Tabs>
             </CardContent>
-            <CardFooter className="flex flex-col gap-2">
-                <div className="text-sm text-center text-muted-foreground">
+            <CardFooter>
+                <div className="w-full text-sm text-center text-muted-foreground">
                     Don&apos;t have an account?{" "}
                     <Link href="/signup" className="underline underline-offset-4 hover:text-primary">
                         Sign up
                     </Link>
                 </div>
-                <div className="text-xs text-center text-muted-foreground/50">
-                    <Link href="/admin" className="hover:text-primary">
-                        Admin Login
-                    </Link>
-                </div>
             </CardFooter>
         </Card>
+    )
+}
+
+export default function LoginPage() {
+    return (
+        <Suspense>
+            <LoginForm />
+        </Suspense>
     )
 }
