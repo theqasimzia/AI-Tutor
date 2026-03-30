@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client"
+import { PrismaClient, Role, LessonStatus } from "@prisma/client"
 import bcrypt from "bcryptjs"
 
 const prisma = new PrismaClient()
@@ -17,7 +17,7 @@ async function main() {
       email: "admin@tutorinacademy.com",
       password: adminPassword,
       name: "Admin User",
-      role: "ADMIN",
+      role: Role.ADMIN,
     },
   })
   console.log("Admin user:", admin.email)
@@ -29,7 +29,7 @@ async function main() {
       email: "parent@demo.com",
       password: parentPassword,
       name: "Jane Doe",
-      role: "PARENT",
+      role: Role.PARENT,
     },
   })
   console.log("Parent user:", parent.email)
@@ -205,15 +205,15 @@ async function main() {
   ]
 
   // --- Lesson Progress for John ---
-  const progressData: { lessonIdx: number; status: string; score: number }[] = [
-    { lessonIdx: 0, status: "COMPLETED", score: 95 },
-    { lessonIdx: 1, status: "COMPLETED", score: 88 },
-    { lessonIdx: 2, status: "COMPLETED", score: 92 },
-    { lessonIdx: 3, status: "COMPLETED", score: 78 },
-    { lessonIdx: 4, status: "IN_PROGRESS", score: 0 },
-    { lessonIdx: 5, status: "IN_PROGRESS", score: 0 },
-    { lessonIdx: 9, status: "COMPLETED", score: 85 },
-    { lessonIdx: 10, status: "IN_PROGRESS", score: 0 },
+  const progressData: { lessonIdx: number; status: LessonStatus; score: number }[] = [
+    { lessonIdx: 0, status: LessonStatus.COMPLETED, score: 95 },
+    { lessonIdx: 1, status: LessonStatus.COMPLETED, score: 88 },
+    { lessonIdx: 2, status: LessonStatus.COMPLETED, score: 92 },
+    { lessonIdx: 3, status: LessonStatus.COMPLETED, score: 78 },
+    { lessonIdx: 4, status: LessonStatus.IN_PROGRESS, score: 0 },
+    { lessonIdx: 5, status: LessonStatus.IN_PROGRESS, score: 0 },
+    { lessonIdx: 9, status: LessonStatus.COMPLETED, score: 85 },
+    { lessonIdx: 10, status: LessonStatus.IN_PROGRESS, score: 0 },
   ]
 
   for (const p of progressData) {
@@ -229,7 +229,7 @@ async function main() {
         lessonId: lesson.id,
         status: p.status,
         score: p.score,
-        completedAt: p.status === "COMPLETED" ? new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000) : null,
+        completedAt: p.status === LessonStatus.COMPLETED ? new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000) : null,
       },
     })
   }

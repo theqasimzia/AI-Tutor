@@ -1,10 +1,11 @@
 import prisma from "@/lib/prisma"
+import { LessonStatus, Role } from "@prisma/client"
 
 export async function getAdminDashboardStats() {
   const [totalUsers, totalStudents, totalCompletedLessons, recentSignups] = await Promise.all([
     prisma.user.count(),
     prisma.student.count(),
-    prisma.lessonProgress.count({ where: { status: "COMPLETED" } }),
+    prisma.lessonProgress.count({ where: { status: LessonStatus.COMPLETED } }),
     prisma.user.findMany({
       orderBy: { createdAt: "desc" },
       take: 10,
@@ -28,8 +29,8 @@ export async function getAllUsers(search?: string, role?: string) {
       { email: { contains: search, mode: "insensitive" } },
     ]
   }
-  if (role) {
-    where.role = role
+  if (role && Object.values(Role).includes(role as Role)) {
+    where.role = role as Role
   }
 
   return prisma.user.findMany({

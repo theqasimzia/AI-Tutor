@@ -11,25 +11,65 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { registerParent } from "@/app/actions/auth-actions"
+import { signupSchema } from "@/lib/validations"
 
 export default function SignupPage() {
     const router = useRouter()
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
+    const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 
     const [firstName, setFirstName] = useState("")
     const [lastName, setLastName] = useState("")
     const [email, setEmail] = useState("")
     const [password, setPassword] = useState("")
 
+    const passwordChecks = {
+        length: password.length >= 8,
+        uppercase: /[A-Z]/.test(password),
+        lowercase: /[a-z]/.test(password),
+        number: /[0-9]/.test(password),
+    }
+
     const handleSignup = async (e: React.FormEvent) => {
         e.preventDefault()
-        setLoading(true)
+        setFieldErrors({})
         setError("")
+
+        const fullName = `${firstName} ${lastName}`.trim()
+
+        if (!firstName.trim()) {
+            setFieldErrors(prev => ({ ...prev, firstName: "First name is required" }))
+            return
+        }
+        if (!lastName.trim()) {
+            setFieldErrors(prev => ({ ...prev, lastName: "Last name is required" }))
+            return
+        }
+
+        const parsed = signupSchema.safeParse({
+            parentName: fullName,
+            email,
+            password,
+            children: [{ yearGroup: "" }],
+        })
+
+        if (!parsed.success) {
+            const errors: Record<string, string> = {}
+            for (const err of parsed.error.issues) {
+                const field = String(err.path[0])
+                if (field === "parentName") errors.firstName = err.message
+                else if (!errors[field]) errors[field] = err.message
+            }
+            setFieldErrors(errors)
+            return
+        }
+
+        setLoading(true)
 
         try {
             const result = await registerParent({
-                parentName: `${firstName} ${lastName}`,
+                parentName: fullName,
                 email,
                 password,
                 children: [{ yearGroup: "" }],
@@ -90,6 +130,9 @@ export default function SignupPage() {
                                 value={firstName}
                                 onChange={(e) => setFirstName(e.target.value)}
                             />
+                            {fieldErrors.firstName && (
+                                <p className="text-red-600 text-sm">{fieldErrors.firstName}</p>
+                            )}
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="last-name">Last name</Label>
@@ -100,6 +143,9 @@ export default function SignupPage() {
                                 value={lastName}
                                 onChange={(e) => setLastName(e.target.value)}
                             />
+                            {fieldErrors.lastName && (
+                                <p className="text-red-600 text-sm">{fieldErrors.lastName}</p>
+                            )}
                         </div>
                     </div>
                     <div className="space-y-2">
@@ -112,6 +158,9 @@ export default function SignupPage() {
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                         />
+                        {fieldErrors.email && (
+                            <p className="text-red-600 text-sm">{fieldErrors.email}</p>
+                        )}
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor="password">Password</Label>
@@ -122,6 +171,25 @@ export default function SignupPage() {
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                         />
+                        {fieldErrors.password && (
+                            <p className="text-red-600 text-sm">{fieldErrors.password}</p>
+                        )}
+                        {password.length > 0 && (
+                            <div className="space-y-1 pt-1">
+                                <p className={`text-sm ${passwordChecks.length ? "text-green-600" : "text-slate-500"}`}>
+                                    {passwordChecks.length ? "\u2713" : "\u2022"} At least 8 characters
+                                </p>
+                                <p className={`text-sm ${passwordChecks.uppercase ? "text-green-600" : "text-slate-500"}`}>
+                                    {passwordChecks.uppercase ? "\u2713" : "\u2022"} At least 1 uppercase letter
+                                </p>
+                                <p className={`text-sm ${passwordChecks.lowercase ? "text-green-600" : "text-slate-500"}`}>
+                                    {passwordChecks.lowercase ? "\u2713" : "\u2022"} At least 1 lowercase letter
+                                </p>
+                                <p className={`text-sm ${passwordChecks.number ? "text-green-600" : "text-slate-500"}`}>
+                                    {passwordChecks.number ? "\u2713" : "\u2022"} At least 1 number
+                                </p>
+                            </div>
+                        )}
                     </div>
                     <Button className="w-full" type="submit" disabled={loading}>
                         {loading ? "Creating account..." : "Sign Up"}

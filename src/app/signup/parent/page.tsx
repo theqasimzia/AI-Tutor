@@ -14,16 +14,18 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { registerParent } from "@/app/actions/auth-actions"
 import { useRouter } from "next/navigation"
 import { signIn } from "next-auth/react"
+import { signupSchema } from "@/lib/validations"
 
 export default function ParentSignupPage() {
     const router = useRouter()
     const [isLoading, setIsLoading] = useState(false)
     const [errorMessage, setErrorMessage] = useState("")
     const [step, setStep] = useState(1)
+    const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
     const [formData, setFormData] = useState({
         parentName: "",
         email: "",
-        password: "", // Added for account creation
+        password: "",
         childCount: "1",
         children: [{ yearGroup: "" }],
         referral: ""
@@ -31,6 +33,13 @@ export default function ParentSignupPage() {
 
     const totalSteps = 3
     const progress = (step / totalSteps) * 100
+
+    const passwordChecks = {
+        length: formData.password.length >= 8,
+        uppercase: /[A-Z]/.test(formData.password),
+        lowercase: /[a-z]/.test(formData.password),
+        number: /[0-9]/.test(formData.password),
+    }
 
     const handleChildCountChange = (value: string) => {
         const count = parseInt(value)
@@ -47,10 +56,85 @@ export default function ParentSignupPage() {
         setFormData(prev => ({ ...prev, children: newChildren }))
     }
 
-    const nextStep = () => setStep(prev => Math.min(prev + 1, totalSteps))
-    const prevStep = () => setStep(prev => Math.max(prev - 1, 1))
+    const validateStep1 = (): boolean => {
+        const errors: Record<string, string> = {}
+
+        if (!formData.parentName.trim() || formData.parentName.trim().length < 2) {
+            errors.parentName = "Name must be at least 2 characters"
+        }
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+        if (!emailRegex.test(formData.email)) {
+            errors.email = "Please enter a valid email address"
+        }
+
+        if (formData.password.length < 8) {
+            errors.password = "Password must be at least 8 characters"
+        } else if (!/[A-Z]/.test(formData.password)) {
+            errors.password = "Password must contain at least 1 uppercase letter"
+        } else if (!/[a-z]/.test(formData.password)) {
+            errors.password = "Password must contain at least 1 lowercase letter"
+        } else if (!/[0-9]/.test(formData.password)) {
+            errors.password = "Password must contain at least 1 number"
+        }
+
+        if (!formData.childCount) {
+            errors.childCount = "Please select number of children"
+        }
+
+        setFieldErrors(errors)
+        return Object.keys(errors).length === 0
+    }
+
+    const validateStep2 = (): boolean => {
+        const errors: Record<string, string> = {}
+        formData.children.forEach((child, index) => {
+            if (!child.yearGroup) {
+                errors[`child-${index}`] = "Please select a year group"
+            }
+        })
+        setFieldErrors(errors)
+        return Object.keys(errors).length === 0
+    }
+
+    const validateStep3 = (): boolean => {
+        const errors: Record<string, string> = {}
+        if (formData.referral && formData.referral.trim() !== "") {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+            if (!emailRegex.test(formData.referral)) {
+                errors.referral = "Please enter a valid email address"
+            }
+        }
+        setFieldErrors(errors)
+        return Object.keys(errors).length === 0
+    }
+
+    const nextStep = () => {
+        if (step === 1 && !validateStep1()) return
+        if (step === 2 && !validateStep2()) return
+        setStep(prev => Math.min(prev + 1, totalSteps))
+        setFieldErrors({})
+    }
+
+    const prevStep = () => {
+        setFieldErrors({})
+        setStep(prev => Math.max(prev - 1, 1))
+    }
 
     const handleSubmit = async () => {
+        if (!validateStep3()) return
+
+        const parsed = signupSchema.safeParse(formData)
+        if (!parsed.success) {
+            const errors: Record<string, string> = {}
+            for (const err of parsed.error.issues) {
+                const field = String(err.path[0])
+                if (!errors[field]) errors[field] = err.message
+            }
+            setFieldErrors(errors)
+            return
+        }
+
         setIsLoading(true)
         setErrorMessage("")
         try {
@@ -153,6 +237,9 @@ export default function ParentSignupPage() {
                                                 onChange={(e) => setFormData({ ...formData, parentName: e.target.value })}
                                             />
                                         </div>
+                                        {fieldErrors.parentName && (
+                                            <p className="text-red-600 text-sm">{fieldErrors.parentName}</p>
+                                        )}
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="email">Email Address *</Label>
@@ -167,6 +254,9 @@ export default function ParentSignupPage() {
                                                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                                             />
                                         </div>
+                                        {fieldErrors.email && (
+                                            <p className="text-red-600 text-sm">{fieldErrors.email}</p>
+                                        )}
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="password">Create Password *</Label>
@@ -181,6 +271,25 @@ export default function ParentSignupPage() {
                                                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                                             />
                                         </div>
+                                        {fieldErrors.password && (
+                                            <p className="text-red-600 text-sm">{fieldErrors.password}</p>
+                                        )}
+                                        {formData.password.length > 0 && (
+                                            <div className="space-y-1 pt-1">
+                                                <p className={`text-sm ${passwordChecks.length ? "text-green-600" : "text-slate-500"}`}>
+                                                    {passwordChecks.length ? "\u2713" : "\u2022"} At least 8 characters
+                                                </p>
+                                                <p className={`text-sm ${passwordChecks.uppercase ? "text-green-600" : "text-slate-500"}`}>
+                                                    {passwordChecks.uppercase ? "\u2713" : "\u2022"} At least 1 uppercase letter
+                                                </p>
+                                                <p className={`text-sm ${passwordChecks.lowercase ? "text-green-600" : "text-slate-500"}`}>
+                                                    {passwordChecks.lowercase ? "\u2713" : "\u2022"} At least 1 lowercase letter
+                                                </p>
+                                                <p className={`text-sm ${passwordChecks.number ? "text-green-600" : "text-slate-500"}`}>
+                                                    {passwordChecks.number ? "\u2713" : "\u2022"} At least 1 number
+                                                </p>
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="space-y-2">
                                         <Label>How many children would you like to sign up? *</Label>
@@ -195,6 +304,9 @@ export default function ParentSignupPage() {
                                                 <SelectItem value="4">4+ Children</SelectItem>
                                             </SelectContent>
                                         </Select>
+                                        {fieldErrors.childCount && (
+                                            <p className="text-red-600 text-sm">{fieldErrors.childCount}</p>
+                                        )}
                                     </div>
                                 </motion.div>
                             )}
@@ -227,6 +339,9 @@ export default function ParentSignupPage() {
                                                     <SelectItem value="year9">Year 9 (Age 13-14)</SelectItem>
                                                 </SelectContent>
                                             </Select>
+                                            {fieldErrors[`child-${index}`] && (
+                                                <p className="text-red-600 text-sm">{fieldErrors[`child-${index}`]}</p>
+                                            )}
                                         </div>
                                     ))}
                                 </motion.div>
@@ -249,6 +364,9 @@ export default function ParentSignupPage() {
                                             value={formData.referral}
                                             onChange={(e) => setFormData({ ...formData, referral: e.target.value })}
                                         />
+                                        {fieldErrors.referral && (
+                                            <p className="text-red-600 text-sm">{fieldErrors.referral}</p>
+                                        )}
                                         <p className="text-xs text-slate-500">Know someone already on AI Tutor Academy? Adding their email might get you both free credits!</p>
                                     </div>
 

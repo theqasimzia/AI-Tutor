@@ -8,13 +8,24 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+enum Role {
+  PARENT
+  ADMIN
+}
+
+enum LessonStatus {
+  LOCKED
+  IN_PROGRESS
+  COMPLETED
+}
+
 // User (Parent or Admin)
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
   password  String   // Hashed password
   name      String?
-  role      String   @default("PARENT") // PARENT, ADMIN
+  role      Role     @default(PARENT)
   
   children  Student[]
   
@@ -93,10 +104,10 @@ model Lesson {
 
 // Progress Tracking
 model LessonProgress {
-  id        String   @id @default(cuid())
+  id        String       @id @default(cuid())
   lessonId  String
-  status    String   @default("LOCKED") // LOCKED, IN_PROGRESS, COMPLETED
-  score     Int      @default(0)
+  status    LessonStatus @default(LOCKED)
+  score     Int          @default(0)
   
   studentId String
   student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)

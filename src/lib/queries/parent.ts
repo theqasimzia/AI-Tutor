@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma"
+import { LessonStatus } from "@prisma/client"
 
 export async function getParentDashboardData(parentId: string) {
   const children = await prisma.student.findMany({
@@ -15,7 +16,7 @@ export async function getParentDashboardData(parentId: string) {
   const totalLessons = await prisma.lesson.count()
 
   const childData = children.map((child) => {
-    const completed = child.progress.filter((p) => p.status === "COMPLETED")
+    const completed = child.progress.filter((p) => p.status === LessonStatus.COMPLETED)
     const completionPct = totalLessons > 0 ? Math.round((completed.length / totalLessons) * 100) : 0
     const recentActivity = child.progress[0]
 
@@ -26,7 +27,7 @@ export async function getParentDashboardData(parentId: string) {
       xp: child.xp,
       completionPct,
       recentActivity: recentActivity
-        ? `${recentActivity.status === "COMPLETED" ? "Completed" : "Started"} '${recentActivity.lesson?.title ?? "a lesson"}'`
+        ? `${recentActivity.status === LessonStatus.COMPLETED ? "Completed" : "Started"} '${recentActivity.lesson?.title ?? "a lesson"}'`
         : "No activity yet",
     }
   })
@@ -36,10 +37,9 @@ export async function getParentDashboardData(parentId: string) {
       ? Math.round(childData.reduce((s, c) => s + c.completionPct, 0) / childData.length)
       : 0
 
-  // Recent alerts from all children
   const allProgress = children.flatMap((c) =>
     c.progress
-      .filter((p) => p.status === "COMPLETED" && p.completedAt)
+      .filter((p) => p.status === LessonStatus.COMPLETED && p.completedAt)
       .map((p) => ({
         childName: c.name,
         lessonTitle: p.lesson?.title ?? "a lesson",
@@ -71,7 +71,6 @@ export async function getChildDetailedProgress(studentId: string) {
   })
   if (!student) return null
 
-  // Per-subject completion
   const subjects = await prisma.subject.findMany({
     include: { modules: { include: { lessons: true } } },
   })
@@ -79,7 +78,7 @@ export async function getChildDetailedProgress(studentId: string) {
   const subjectProgress = subjects.map((subject) => {
     const subjectLessonIds = subject.modules.flatMap((m) => m.lessons.map((l) => l.id))
     const completed = student.progress.filter(
-      (p) => subjectLessonIds.includes(p.lessonId) && p.status === "COMPLETED"
+      (p) => subjectLessonIds.includes(p.lessonId) && p.status === LessonStatus.COMPLETED
     ).length
     const total = subjectLessonIds.length
     return {

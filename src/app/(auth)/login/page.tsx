@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
-import { signIn, useSession } from "next-auth/react"
+import { signIn } from "next-auth/react"
 import { GraduationCap } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -11,11 +11,13 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { loginSchema } from "@/lib/validations"
 
 export default function LoginPage() {
     const router = useRouter()
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
+    const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 
     const [studentEmail, setStudentEmail] = useState("")
     const [studentPassword, setStudentPassword] = useState("")
@@ -23,11 +25,24 @@ export default function LoginPage() {
     const [parentPassword, setParentPassword] = useState("")
 
     const handleLogin = async (role: "student" | "parent") => {
-        setLoading(true)
+        setFieldErrors({})
         setError("")
 
         const email = role === "student" ? studentEmail : parentEmail
         const password = role === "student" ? studentPassword : parentPassword
+
+        const parsed = loginSchema.safeParse({ email, password })
+        if (!parsed.success) {
+            const errors: Record<string, string> = {}
+            for (const err of parsed.error.issues) {
+                const key = `${role}-${String(err.path[0])}`
+                if (!errors[key]) errors[key] = err.message
+            }
+            setFieldErrors(errors)
+            return
+        }
+
+        setLoading(true)
 
         try {
             const result = await signIn("credentials", {
@@ -75,7 +90,7 @@ export default function LoginPage() {
                         {error}
                     </div>
                 )}
-                <Tabs defaultValue="student" className="w-full" onValueChange={() => setError("")}>
+                <Tabs defaultValue="student" className="w-full" onValueChange={() => { setError(""); setFieldErrors({}) }}>
                     <TabsList className="grid w-full grid-cols-2 mb-4">
                         <TabsTrigger value="student">Student</TabsTrigger>
                         <TabsTrigger value="parent">Parent</TabsTrigger>
@@ -93,6 +108,9 @@ export default function LoginPage() {
                                     value={studentEmail}
                                     onChange={(e) => setStudentEmail(e.target.value)}
                                 />
+                                {fieldErrors["student-email"] && (
+                                    <p className="text-red-600 text-sm">{fieldErrors["student-email"]}</p>
+                                )}
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="s-password">Password</Label>
@@ -103,6 +121,9 @@ export default function LoginPage() {
                                     value={studentPassword}
                                     onChange={(e) => setStudentPassword(e.target.value)}
                                 />
+                                {fieldErrors["student-password"] && (
+                                    <p className="text-red-600 text-sm">{fieldErrors["student-password"]}</p>
+                                )}
                             </div>
                             <Button className="w-full" type="submit" disabled={loading}>
                                 {loading ? "Logging in..." : "Login as Student"}
@@ -125,6 +146,9 @@ export default function LoginPage() {
                                     value={parentEmail}
                                     onChange={(e) => setParentEmail(e.target.value)}
                                 />
+                                {fieldErrors["parent-email"] && (
+                                    <p className="text-red-600 text-sm">{fieldErrors["parent-email"]}</p>
+                                )}
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="p-password">Password</Label>
@@ -135,6 +159,9 @@ export default function LoginPage() {
                                     value={parentPassword}
                                     onChange={(e) => setParentPassword(e.target.value)}
                                 />
+                                {fieldErrors["parent-password"] && (
+                                    <p className="text-red-600 text-sm">{fieldErrors["parent-password"]}</p>
+                                )}
                             </div>
                             <Button className="w-full" type="submit" variant="secondary" disabled={loading}>
                                 {loading ? "Logging in..." : "Login as Parent"}

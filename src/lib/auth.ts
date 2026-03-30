@@ -3,6 +3,7 @@ import CredentialsProvider from "next-auth/providers/credentials"
 import { PrismaAdapter } from "@next-auth/prisma-adapter"
 import bcrypt from "bcryptjs"
 import prisma from "@/lib/prisma"
+import { rateLimit } from "@/lib/rate-limit"
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
@@ -15,6 +16,14 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
+          return null
+        }
+
+        const rl = rateLimit(`login:${credentials.email}`, {
+          maxAttempts: 5,
+          windowMs: 15 * 60 * 1000,
+        })
+        if (!rl.success) {
           return null
         }
 

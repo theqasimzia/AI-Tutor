@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma"
+import { LessonStatus } from "@prisma/client"
 
 export async function getStudentsByParentId(parentId: string) {
   return prisma.student.findMany({
@@ -31,10 +32,9 @@ export async function getStudentDashboardData(studentId: string) {
   })
   if (!student) return null
 
-  const completedLessons = student.progress.filter((p) => p.status === "COMPLETED")
+  const completedLessons = student.progress.filter((p) => p.status === LessonStatus.COMPLETED)
   const recentLessons = student.progress.slice(0, 5)
 
-  // Weekly XP: sum scores from this week's completed lessons
   const weekStart = new Date()
   weekStart.setDate(weekStart.getDate() - weekStart.getDay())
   weekStart.setHours(0, 0, 0, 0)
@@ -42,7 +42,6 @@ export async function getStudentDashboardData(studentId: string) {
     .filter((p) => p.completedAt && p.completedAt >= weekStart)
     .reduce((sum, p) => sum + p.score, 0)
 
-  // Streak: consecutive days with completed lessons counting back from today
   let streak = 0
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -67,7 +66,6 @@ export async function getStudentDashboardData(studentId: string) {
     }
   }
 
-  // Average accuracy
   const completedWithScores = completedLessons.filter((p) => p.score > 0)
   const avgAccuracy =
     completedWithScores.length > 0
