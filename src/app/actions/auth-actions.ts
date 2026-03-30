@@ -69,7 +69,8 @@ export async function registerParent(data: SignupData) {
 
         return { success: true, userId: user.id, message: "Account created successfully!" }
     } catch (e) {
-        console.error("Registration error:", e)
+        const { logger } = await import("@/lib/logger")
+        logger.error("Registration error", { error: String(e) })
         return { success: false, message: "Failed to create account. Please try again." }
     }
 }

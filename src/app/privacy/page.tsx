@@ -1,3 +1,11 @@
+import type { Metadata } from "next"
+
+export const metadata: Metadata = {
+    title: "Privacy Policy | AI Tutor Academy",
+    description:
+        "Learn how AI Tutor Academy protects your data and your child's privacy. GDPR-compliant and built with privacy-first principles.",
+}
+
 export default function PrivacyPage() {
     return (
         <div className="container mx-auto px-4 py-8">

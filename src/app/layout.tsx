@@ -12,8 +12,18 @@ const outfit = Outfit({
 });
 
 export const metadata: Metadata = {
-  title: "AI Tutor Academy",
-  description: "Personalized AI-powered learning platform for UK Maths and English.",
+  title: {
+    template: "%s | AI Tutor Academy",
+    default: "AI Tutor Academy — Personalised AI Tutoring for UK Maths & English",
+  },
+  description:
+    "Build confidence in Maths and English with a patient, voice-interactive AI tutor that adapts to your child's unique learning pace. Aligned with the UK National Curriculum (KS2 & KS3).",
+  metadataBase: new URL(process.env.NEXTAUTH_URL || "https://aitutoracademy.com"),
+  openGraph: {
+    type: "website",
+    locale: "en_GB",
+    siteName: "AI Tutor Academy",
+  },
 };
 
 export default function RootLayout({
