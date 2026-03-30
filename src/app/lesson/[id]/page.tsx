@@ -2,9 +2,9 @@
 
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
-import { ArrowLeft, MoreVertical, Settings, Mic, MessageSquare, Maximize2, X, MoreHorizontal } from "lucide-react"
+import { ArrowLeft, MoreVertical, Settings, Mic, MessageSquare, Maximize2, X } from "lucide-react"
 import { motion } from "framer-motion"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 
 import { Button } from "@/components/ui/button"
 import { VoiceTutor } from "@/components/voice-tutor"
@@ -17,13 +17,28 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
+import { getLessonById } from "@/lib/queries/curriculum"
+import { completeLesson, startLesson } from "@/app/actions/student-actions"
 
 export default function LessonPage() {
     const params = useParams()
     const router = useRouter()
     const [isFullscreen, setIsFullscreen] = useState(false)
+    const [lessonData, setLessonData] = useState<any>(null)
 
-    const lessonTitle = params.id?.toString().replace(/-/g, ' ') || "Overview"
+    const lessonId = params.id?.toString() ?? ""
+    const fallbackTitle = lessonId.replace(/-/g, " ")
+
+    useEffect(() => {
+        if (!lessonId) return
+        getLessonById(lessonId).then((data) => {
+            if (data) setLessonData(data)
+        })
+    }, [lessonId])
+
+    const lessonTitle = lessonData?.title ?? fallbackTitle
+    const subjectName = lessonData?.module?.subject?.name ?? "Mathematics"
+    const keyStage = lessonData?.module?.subject?.keyStage ?? "KS2"
 
     const toggleFullscreen = () => {
         if (!document.fullscreenElement) {
@@ -35,7 +50,7 @@ export default function LessonPage() {
         }
     }
 
-    const endLesson = () => {
+    const endLesson = async () => {
         router.push("/student/dashboard")
     }
 
@@ -52,7 +67,7 @@ export default function LessonPage() {
                     </Button>
                     <div>
                         <h1 className="font-bold text-slate-800 capitalize text-lg leading-tight">{lessonTitle}</h1>
-                        <p className="text-xs text-slate-500 font-medium">Mathematics • KS2 • Level 4</p>
+                        <p className="text-xs text-slate-500 font-medium">{subjectName} • {keyStage}</p>
                     </div>
                 </div>
 

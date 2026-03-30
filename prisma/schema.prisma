@@ -33,9 +33,60 @@ model Student {
   parentId  String
   parent    User     @relation(fields: [parentId], references: [id], onDelete: Cascade)
   
-  progress  LessonProgress[]
+  progress     LessonProgress[]
   achievements Achievement[]
+  gameScores   GameScore[]
   
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Curriculum - Subject
+model Subject {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  color       String?
+  icon        String?
+  keyStage    String
+  order       Int      @default(0)
+
+  modules   Module[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Curriculum - Module (topic/unit within a subject)
+model Module {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  order       Int      @default(0)
+
+  subjectId String
+  subject   Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  lessons Lesson[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Curriculum - Lesson (individual lesson within a module)
+model Lesson {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  duration    Int?
+  order       Int      @default(0)
+
+  moduleId String
+  module   Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  progress LessonProgress[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -49,6 +100,8 @@ model LessonProgress {
   
   studentId String
   student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  lesson    Lesson?  @relation(fields: [lessonId], references: [id], onDelete: Cascade)
   
   completedAt DateTime?
   updatedAt   DateTime @updatedAt
@@ -66,4 +119,17 @@ model Achievement {
   student       Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@unique([studentId, achievementId])
+}
+
+// Gamification - Game Scores
+model GameScore {
+  id        String   @id @default(cuid())
+  gameId    String
+  score     Int
+  xpEarned  Int      @default(0)
+
+  studentId String
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  playedAt  DateTime @default(now())
 }

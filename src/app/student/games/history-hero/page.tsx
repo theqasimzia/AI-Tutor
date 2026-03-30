@@ -4,6 +4,8 @@ import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { History, Check, X, ShieldQuestion, ArrowRight } from "lucide-react"
+import { useStudent } from "@/lib/student-context"
+import { submitGameScore } from "@/app/actions/student-actions"
 
 // Mock Questions
 const timelineData = [
@@ -49,16 +51,18 @@ export default function HistoryHeroPage() {
     const [isCorrect, setIsCorrect] = useState<boolean | null>(null)
     const [score, setScore] = useState(0)
 
+    const { selectedStudent } = useStudent()
+
     const handleOptionSelect = (isCorrectAnswer: boolean, optionId: string) => {
-        if (selectedOption) return // Prevent duplicate clicks
+        if (selectedOption) return
         setSelectedOption(optionId)
         setIsCorrect(isCorrectAnswer)
 
         if (isCorrectAnswer) {
             setScore(s => s + 100)
-            // Save XP
-            const currentXP = parseInt(localStorage.getItem('student_xp') || '1250')
-            localStorage.setItem('student_xp', (currentXP + 100).toString())
+            if (selectedStudent?.id) {
+                submitGameScore(selectedStudent.id, "history-hero", 100, 100)
+            }
         }
 
         setTimeout(() => {

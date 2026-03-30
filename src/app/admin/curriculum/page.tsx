@@ -1,10 +1,43 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Plus, Folder, FileText, MoveVertical } from "lucide-react"
+import { Plus, Folder, FileText } from "lucide-react"
+import { getSubjectsWithModulesAndLessons } from "@/lib/queries/admin"
+
+type CurriculumData = Awaited<ReturnType<typeof getSubjectsWithModulesAndLessons>>
+
+const borderColorMap: Record<string, string> = {
+    blue: "border-l-blue-500",
+    pink: "border-l-pink-500",
+    orange: "border-l-orange-500",
+    green: "border-l-green-500",
+    purple: "border-l-purple-500",
+}
 
 export default function CurriculumPage() {
+    const [subjects, setSubjects] = useState<CurriculumData>([])
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => {
+        getSubjectsWithModulesAndLessons().then((d) => {
+            setSubjects(d)
+            setLoading(false)
+        })
+    }, [])
+
+    if (loading) {
+        return (
+            <div className="space-y-6 animate-pulse">
+                <div className="h-12 bg-slate-200 rounded-xl w-1/2" />
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {[1, 2, 3].map(i => <div key={i} className="h-48 bg-slate-200 rounded-xl" />)}
+                </div>
+            </div>
+        )
+    }
+
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
@@ -18,55 +51,34 @@ export default function CurriculumPage() {
             </div>
 
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {/* Math Module */}
-                <Card className="border-l-4 border-l-blue-500">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-base font-bold">Mathematics (KS2)</CardTitle>
-                        <Folder className="h-4 w-4 text-slate-400" />
-                    </CardHeader>
-                    <CardContent>
-                        <CardDescription className="mb-4">Core numeracy skills including fractions, decimals, and geometry.</CardDescription>
-                        <div className="space-y-2">
-                            <LessonItem title="Place Value" status="Published" />
-                            <LessonItem title="Fractions & Decimals" status="Published" />
-                            <LessonItem title="Geometry Basics" status="Draft" />
-                        </div>
-                        <Button variant="outline" size="sm" className="w-full mt-4">Manage Lessons</Button>
-                    </CardContent>
-                </Card>
+                {subjects.map((subject) => (
+                    subject.modules.map((mod) => (
+                        <Card key={mod.id} className={`border-l-4 ${borderColorMap[subject.color ?? "blue"]}`}>
+                            <CardHeader className="flex flex-row items-center justify-between pb-2">
+                                <CardTitle className="text-base font-bold">{subject.name} ({subject.keyStage})</CardTitle>
+                                <Folder className="h-4 w-4 text-slate-400" />
+                            </CardHeader>
+                            <CardContent>
+                                <CardDescription className="mb-4">{mod.description ?? mod.title}</CardDescription>
+                                <div className="space-y-2">
+                                    {mod.lessons.map((lesson) => (
+                                        <LessonItem key={lesson.id} title={lesson.title} status="Published" />
+                                    ))}
+                                    {mod.lessons.length === 0 && (
+                                        <p className="text-sm text-slate-400">No lessons yet.</p>
+                                    )}
+                                </div>
+                                <Button variant="outline" size="sm" className="w-full mt-4">Manage Lessons</Button>
+                            </CardContent>
+                        </Card>
+                    ))
+                ))}
 
-                {/* English Module */}
-                <Card className="border-l-4 border-l-green-500">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-base font-bold">English (KS2)</CardTitle>
-                        <Folder className="h-4 w-4 text-slate-400" />
-                    </CardHeader>
-                    <CardContent>
-                        <CardDescription className="mb-4">Reading comprehension, grammar, and creative writing.</CardDescription>
-                        <div className="space-y-2">
-                            <LessonItem title="Nouns & Verbs" status="Published" />
-                            <LessonItem title="Creative Writing" status="Draft" />
-                            <LessonItem title="Reading Comprehension" status="Draft" />
-                        </div>
-                        <Button variant="outline" size="sm" className="w-full mt-4">Manage Lessons</Button>
-                    </CardContent>
-                </Card>
-
-                {/* Science Module */}
-                <Card className="border-l-4 border-l-indigo-500">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-base font-bold">Science (KS2)</CardTitle>
-                        <Folder className="h-4 w-4 text-slate-400" />
-                    </CardHeader>
-                    <CardContent>
-                        <CardDescription className="mb-4">Biology, physics, and chemistry basics.</CardDescription>
-                        <div className="space-y-2">
-                            <LessonItem title="The Solar System" status="Published" />
-                            <LessonItem title="Plants & Photosynthesis" status="Draft" />
-                        </div>
-                        <Button variant="outline" size="sm" className="w-full mt-4">Manage Lessons</Button>
-                    </CardContent>
-                </Card>
+                {subjects.length === 0 && (
+                    <div className="col-span-3 text-center p-12 text-slate-500 bg-slate-50 rounded-2xl border border-dashed border-slate-300">
+                        No curriculum data yet. Start by adding subjects and modules.
+                    </div>
+                )}
             </div>
         </div>
     )

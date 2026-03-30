@@ -1,33 +1,60 @@
 "use client"
 
+import { useEffect, useState } from "react"
+import { useSession } from "next-auth/react"
 import { Activity, Clock, TrendingUp, Users, ArrowUpRight, CheckCircle2, AlertCircle } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
+import { getParentDashboardData } from "@/lib/queries/parent"
+
+type DashData = Awaited<ReturnType<typeof getParentDashboardData>>
 
 export default function ParentDashboard() {
+    const { data: session } = useSession()
+    const [data, setData] = useState<DashData | null>(null)
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => {
+        if (!session?.user?.id) return
+        getParentDashboardData(session.user.id).then((d) => {
+            setData(d)
+            setLoading(false)
+        })
+    }, [session?.user?.id])
+
+    if (loading || !data) {
+        return (
+            <div className="space-y-8 animate-pulse">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {[1, 2, 3].map(i => <div key={i} className="h-32 bg-slate-200 rounded-xl" />)}
+                </div>
+            </div>
+        )
+    }
+
     return (
         <div className="space-y-8">
             {/* Overview Stats */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <SummaryCard
                     title="Active Children"
-                    value="2"
+                    value={data.childrenCount.toString()}
                     icon={<Users className="h-5 w-5 text-indigo-600" />}
-                    trend="+1 this month"
+                    trend={`${data.childrenCount} registered`}
                 />
                 <SummaryCard
                     title="Avg. Syllabus Completion"
-                    value="72%"
+                    value={`${data.avgCompletion}%`}
                     icon={<TrendingUp className="h-5 w-5 text-green-600" />}
-                    trend="+5% vs last week"
-                    trendUp
+                    trend="Across all children"
+                    trendUp={data.avgCompletion > 50}
                 />
                 <SummaryCard
                     title="Time Spent Learning"
-                    value="12.5 hrs"
+                    value="—"
                     icon={<Clock className="h-5 w-5 text-blue-600" />}
-                    trend="Total this week"
+                    trend="Tracking coming soon"
                 />
             </div>
 
@@ -41,25 +68,25 @@ export default function ParentDashboard() {
                 </div>
 
                 <div className="grid md:grid-cols-2 gap-6">
-                    <ChildSnapshotCard
-                        name="John Doe"
-                        grade="Year 5"
-                        xp="1,250"
-                        streak="5 Day Streak"
-                        recentActivity="Completed 'Introduction to Fractions'"
-                        status="On Track"
-                        color="bg-indigo-500"
-                    />
-                    <ChildSnapshotCard
-                        name="Sarah Doe"
-                        grade="Year 3"
-                        xp="850"
-                        streak="2 Day Streak"
-                        recentActivity="Started 'Nouns & Verbs'"
-                        status="Needs Attention"
-                        color="bg-pink-500"
-                        alert
-                    />
+                    {data.children.length > 0 ? (
+                        data.children.map((child, idx) => (
+                            <ChildSnapshotCard
+                                key={child.id}
+                                name={child.name}
+                                grade={child.grade ?? "Not set"}
+                                xp={child.xp.toLocaleString()}
+                                streak="—"
+                                recentActivity={child.recentActivity}
+                                status={child.completionPct > 30 ? "On Track" : "Needs Attention"}
+                                color={idx % 2 === 0 ? "bg-indigo-500" : "bg-pink-500"}
+                                alert={child.completionPct <= 30}
+                            />
+                        ))
+                    ) : (
+                        <div className="col-span-2 text-center p-12 text-slate-500 bg-slate-50 rounded-2xl border border-dashed border-slate-300">
+                            No children registered yet. Add a child to get started.
+                        </div>
+                    )}
                 </div>
             </section>
 
@@ -67,22 +94,34 @@ export default function ParentDashboard() {
             <section className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
                 <h3 className="font-bold text-lg mb-4 text-slate-900">Recent Alerts</h3>
                 <div className="space-y-4">
-                    <AlertItem
-                        icon={<CheckCircle2 className="h-5 w-5 text-green-500" />}
-                        title="Lesson Completed"
-                        message="John completed 'Introduction to Fractions' with 85% accuracy."
-                        time="2 hours ago"
-                    />
-                    <AlertItem
-                        icon={<AlertCircle className="h-5 w-5 text-amber-500" />}
-                        title="Daily Goal Missed"
-                        message="Sarah hasn't logged in today. Encourage her to keep her streak!"
-                        time="5 hours ago"
-                    />
+                    {data.recentAlerts.length > 0 ? (
+                        data.recentAlerts.map((alert, i) => (
+                            <AlertItem
+                                key={i}
+                                icon={<CheckCircle2 className="h-5 w-5 text-green-500" />}
+                                title="Lesson Completed"
+                                message={`${alert.childName} completed '${alert.lessonTitle}' with ${alert.score}% accuracy.`}
+                                time={timeAgo(alert.completedAt)}
+                            />
+                        ))
+                    ) : (
+                        <p className="text-sm text-slate-500">No recent activity to show.</p>
+                    )}
                 </div>
             </section>
         </div>
     )
+}
+
+function timeAgo(date: Date) {
+    const seconds = Math.floor((Date.now() - new Date(date).getTime()) / 1000)
+    if (seconds < 60) return "Just now"
+    const minutes = Math.floor(seconds / 60)
+    if (minutes < 60) return `${minutes}m ago`
+    const hours = Math.floor(minutes / 60)
+    if (hours < 24) return `${hours}h ago`
+    const days = Math.floor(hours / 24)
+    return `${days}d ago`
 }
 
 function SummaryCard({ title, value, icon, trend, trendUp }: any) {

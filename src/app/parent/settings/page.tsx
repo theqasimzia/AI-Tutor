@@ -1,12 +1,27 @@
 "use client"
 
+import { useState } from "react"
+import { useSession } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
+import { updateParentProfile } from "@/app/actions/parent-actions"
 
 export default function SettingsPage() {
+    const { data: session } = useSession()
+    const [name, setName] = useState(session?.user?.name ?? "")
+    const [email, setEmail] = useState(session?.user?.email ?? "")
+    const [saving, setSaving] = useState(false)
+
+    const handleSave = async () => {
+        if (!session?.user?.id) return
+        setSaving(true)
+        await updateParentProfile(session.user.id, { name: name || undefined, email: email || undefined })
+        setSaving(false)
+    }
+
     return (
         <div className="max-w-2xl mx-auto space-y-8">
             <div>
@@ -20,14 +35,24 @@ export default function SettingsPage() {
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label htmlFor="parentName">Full Name</Label>
-                            <Input id="parentName" defaultValue="Jane Doe" />
+                            <Input
+                                id="parentName"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                            />
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="email">Email Address</Label>
-                            <Input id="email" defaultValue="jane.doe@example.com" />
+                            <Input
+                                id="email"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                            />
                         </div>
                     </div>
-                    <Button>Save Changes</Button>
+                    <Button onClick={handleSave} disabled={saving}>
+                        {saving ? "Saving..." : "Save Changes"}
+                    </Button>
                 </div>
 
                 <Separator />

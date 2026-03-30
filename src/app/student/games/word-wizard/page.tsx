@@ -4,6 +4,8 @@ import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Brain, Star, Wand2, RefreshCw, RotateCcw } from "lucide-react"
+import { useStudent } from "@/lib/student-context"
+import { submitGameScore } from "@/app/actions/student-actions"
 
 // Mock Word List
 const words = [
@@ -37,25 +39,25 @@ export default function WordWizardPage() {
         setGameState("playing")
     }
 
+    const { selectedStudent } = useStudent()
+
     const handleLetterClick = (index: number) => {
         if (selectedIndices.includes(index) || gameState !== "playing") return
 
         const newSelected = [...selectedIndices, index]
         setSelectedIndices(newSelected)
 
-        // Check if full word formed
         if (newSelected.length === currentWordObj.word.length) {
             const formedWord = newSelected.map(i => scrambledLetters[i]).join("")
             if (formedWord === currentWordObj.word) {
                 setGameState("success")
                 setScore(s => s + 50)
-                // Award XP
-                const currentXP = parseInt(localStorage.getItem('student_xp') || '1250')
-                localStorage.setItem('student_xp', (currentXP + 50).toString())
+                if (selectedStudent?.id) {
+                    submitGameScore(selectedStudent.id, "word-wizard", 50, 50)
+                }
             } else {
-                // Wrong word animation could go here
                 setTimeout(() => {
-                    setSelectedIndices([]) // Reset on wrong
+                    setSelectedIndices([])
                 }, 500)
             }
         }

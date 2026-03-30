@@ -1,3 +1,8 @@
+/**
+ * LEGACY: This static curriculum data is kept as a reference for the seed script (prisma/seed.ts).
+ * The actual curriculum is now stored in the database (Subject > Module > Lesson models).
+ * All pages now fetch curriculum data from the database via src/lib/queries/curriculum.ts.
+ */
 export const curriculum = {
     maths: {
         ks2: [

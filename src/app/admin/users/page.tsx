@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Search, Filter, MoreHorizontal, Shield, User } from "lucide-react"
@@ -10,17 +11,44 @@ import {
     DropdownMenuLabel,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { getAllUsers } from "@/lib/queries/admin"
+import { deleteUser, updateUserRole } from "@/app/actions/admin-actions"
 
-const users = [
-    { id: 1, name: "Alice Smith", email: "alice@example.com", role: "Student", status: "Active" },
-    { id: 2, name: "Bob Jones", email: "bob@example.com", role: "Parent", status: "Active" },
-    { id: 3, name: "Charlie Brown", email: "charlie@example.com", role: "Student", status: "Inactive" },
-    { id: 4, name: "David Wilson", email: "david@example.com", role: "Admin", status: "Active" },
-    { id: 5, name: "Eve Davis", email: "eve@example.com", role: "Student", status: "Active" },
-    { id: 6, name: "Frank Miller", email: "frank@example.com", role: "Parent", status: "Active" },
-]
+type UserData = Awaited<ReturnType<typeof getAllUsers>>[number]
 
 export default function UsersPage() {
+    const [users, setUsers] = useState<UserData[]>([])
+    const [search, setSearch] = useState("")
+    const [loading, setLoading] = useState(true)
+
+    const fetchUsers = (searchTerm?: string) => {
+        setLoading(true)
+        getAllUsers(searchTerm || undefined).then((u) => {
+            setUsers(u)
+            setLoading(false)
+        })
+    }
+
+    useEffect(() => {
+        fetchUsers()
+    }, [])
+
+    useEffect(() => {
+        const timer = setTimeout(() => fetchUsers(search), 300)
+        return () => clearTimeout(timer)
+    }, [search])
+
+    const handleDelete = async (userId: string) => {
+        if (!confirm("Are you sure you want to delete this user?")) return
+        await deleteUser(userId)
+        fetchUsers(search)
+    }
+
+    const handleRoleChange = async (userId: string, newRole: string) => {
+        await updateUserRole(userId, newRole)
+        fetchUsers(search)
+    }
+
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
@@ -31,7 +59,12 @@ export default function UsersPage() {
             <div className="flex items-center gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                 <div className="relative flex-1 max-w-sm">
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-500" />
-                    <Input placeholder="Search users..." className="pl-9" />
+                    <Input
+                        placeholder="Search users..."
+                        className="pl-9"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                    />
                 </div>
                 <Button variant="outline" className="gap-2">
                     <Filter className="h-4 w-4" /> Filter
@@ -50,25 +83,28 @@ export default function UsersPage() {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                        {users.map((user) => (
+                        {loading ? (
+                            <tr><td colSpan={5} className="px-6 py-8 text-center text-slate-500">Loading...</td></tr>
+                        ) : users.length === 0 ? (
+                            <tr><td colSpan={5} className="px-6 py-8 text-center text-slate-500">No users found.</td></tr>
+                        ) : users.map((user) => (
                             <tr key={user.id} className="hover:bg-slate-50">
                                 <td className="px-6 py-4 font-medium text-slate-900 flex items-center gap-3">
                                     <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500">
                                         <User className="h-4 w-4" />
                                     </div>
-                                    {user.name}
+                                    {user.name ?? "—"}
                                 </td>
                                 <td className="px-6 py-4 text-slate-500">{user.email}</td>
                                 <td className="px-6 py-4">
                                     <div className="flex items-center gap-2">
-                                        {user.role === 'Admin' && <Shield className="h-3 w-3 text-red-500" />}
+                                        {user.role === 'ADMIN' && <Shield className="h-3 w-3 text-red-500" />}
                                         <span>{user.role}</span>
                                     </div>
                                 </td>
                                 <td className="px-6 py-4">
-                                    <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${user.status === 'Active' ? 'bg-green-50 text-green-700 ring-1 ring-green-600/20' : 'bg-slate-100 text-slate-600 ring-1 ring-slate-500/20'
-                                        }`}>
-                                        {user.status}
+                                    <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-green-50 text-green-700 ring-1 ring-green-600/20">
+                                        Active
                                     </span>
                                 </td>
                                 <td className="px-6 py-4 text-right">
@@ -80,9 +116,19 @@ export default function UsersPage() {
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end">
                                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                            <DropdownMenuItem>Edit User</DropdownMenuItem>
-                                            <DropdownMenuItem>Reset Password</DropdownMenuItem>
-                                            <DropdownMenuItem className="text-red-600">Delete User</DropdownMenuItem>
+                                            {user.role !== "ADMIN" && (
+                                                <DropdownMenuItem onClick={() => handleRoleChange(user.id, "ADMIN")}>
+                                                    Make Admin
+                                                </DropdownMenuItem>
+                                            )}
+                                            {user.role !== "PARENT" && (
+                                                <DropdownMenuItem onClick={() => handleRoleChange(user.id, "PARENT")}>
+                                                    Make Parent
+                                                </DropdownMenuItem>
+                                            )}
+                                            <DropdownMenuItem className="text-red-600" onClick={() => handleDelete(user.id)}>
+                                                Delete User
+                                            </DropdownMenuItem>
                                         </DropdownMenuContent>
                                     </DropdownMenu>
                                 </td>

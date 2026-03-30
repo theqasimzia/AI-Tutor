@@ -1,10 +1,57 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
 import { Trophy, Star, Shield, Zap, Target, Award, Crown } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
+import { useStudent } from "@/lib/student-context"
+import { getStudentAchievements, getStudentDashboardData } from "@/lib/queries/student"
+
+const badgeDefinitions: Record<string, { icon: React.ReactNode; title: string; description: string }> = {
+    "quick-learner": { icon: <Zap className="h-8 w-8 text-yellow-500" />, title: "Quick Learner", description: "Complete 5 lessons in one day" },
+    "streak-7": { icon: <Shield className="h-8 w-8 text-blue-500" />, title: "Protector", description: "Maintain a 7-day streak" },
+    "sharpshooter": { icon: <Target className="h-8 w-8 text-red-500" />, title: "Sharpshooter", description: "Get 100% on a quiz" },
+    "super-star": { icon: <Star className="h-8 w-8 text-purple-500" />, title: "Super Star", description: "Earn 1000 XP" },
+    "scholar-king": { icon: <Crown className="h-8 w-8 text-slate-300" />, title: "Scholar King", description: "Reach Level 10" },
+    "math-whiz": { icon: <Award className="h-8 w-8 text-slate-300" />, title: "Math Whiz", description: "Complete all Math modules" },
+}
 
 export default function AchievementsPage() {
+    const { selectedStudent, loading: ctxLoading } = useStudent()
+    const [achievements, setAchievements] = useState<any[]>([])
+    const [dashData, setDashData] = useState<any>(null)
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => {
+        if (!selectedStudent?.id) return
+        setLoading(true)
+        Promise.all([
+            getStudentAchievements(selectedStudent.id),
+            getStudentDashboardData(selectedStudent.id),
+        ]).then(([achv, dash]) => {
+            setAchievements(achv)
+            setDashData(dash)
+            setLoading(false)
+        })
+    }, [selectedStudent?.id])
+
+    const xp = selectedStudent?.xp ?? 0
+    const level = Math.floor(xp / 500) + 1
+    const nextLevelXp = level * 500
+    const progressPct = nextLevelXp > 0 ? Math.round((xp / nextLevelXp) * 100) : 0
+    const streak = dashData?.streak ?? 0
+    const unlockedIds = new Set(achievements.map((a: any) => a.achievementId))
+    const badgeCount = achievements.length
+
+    if (ctxLoading || loading) {
+        return <div className="space-y-10 animate-pulse"><div className="h-48 bg-slate-200 rounded-3xl" /></div>
+    }
+
+    const allBadges = Object.entries(badgeDefinitions).map(([id, def]) => ({
+        ...def,
+        achieved: unlockedIds.has(id),
+    }))
+
     return (
         <div className="space-y-10">
             {/* Header / XP Summary */}
@@ -20,19 +67,19 @@ export default function AchievementsPage() {
 
                     <div className="flex-1 space-y-4">
                         <div>
-                            <h1 className="text-3xl font-bold tracking-tight mb-1">Level 4 Scholar</h1>
-                            <p className="text-slate-400">You are in the top 5% of students this week!</p>
+                            <h1 className="text-3xl font-bold tracking-tight mb-1">Level {level} Scholar</h1>
+                            <p className="text-slate-400">Keep going to reach the next level!</p>
                         </div>
 
                         <div className="max-w-md space-y-2">
                             <div className="flex justify-between text-sm font-bold text-slate-300">
-                                <span>1,250 XP</span>
-                                <span>Next Level: 2,000 XP</span>
+                                <span>{xp.toLocaleString()} XP</span>
+                                <span>Next Level: {nextLevelXp.toLocaleString()} XP</span>
                             </div>
                             <div className="h-3 w-full bg-slate-800 rounded-full overflow-hidden border border-slate-700">
                                 <motion.div
                                     initial={{ width: 0 }}
-                                    animate={{ width: "62%" }}
+                                    animate={{ width: `${Math.min(progressPct, 100)}%` }}
                                     transition={{ duration: 1, delay: 0.5 }}
                                     className="h-full bg-gradient-to-r from-amber-400 to-orange-500 rounded-full"
                                 />
@@ -42,15 +89,15 @@ export default function AchievementsPage() {
 
                     <div className="grid grid-cols-3 gap-6 text-center">
                         <div>
-                            <div className="text-2xl font-bold text-white">5</div>
+                            <div className="text-2xl font-bold text-white">{streak}</div>
                             <div className="text-xs uppercase font-bold text-slate-500 tracking-wider">Streak</div>
                         </div>
                         <div>
-                            <div className="text-2xl font-bold text-white">12</div>
+                            <div className="text-2xl font-bold text-white">{badgeCount}</div>
                             <div className="text-xs uppercase font-bold text-slate-500 tracking-wider">Badges</div>
                         </div>
                         <div>
-                            <div className="text-2xl font-bold text-white">#8</div>
+                            <div className="text-2xl font-bold text-white">#{Math.max(1, 10 - level)}</div>
                             <div className="text-xs uppercase font-bold text-slate-500 tracking-wider">Rank</div>
                         </div>
                     </div>
@@ -61,12 +108,9 @@ export default function AchievementsPage() {
             <section>
                 <h2 className="text-2xl font-bold text-slate-800 mb-6">Badges & Medals</h2>
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                    <BadgeCard icon={<Zap className="h-8 w-8 text-yellow-500" />} title="Quick Learner" description="Complete 5 lessons in one day" achieved={true} />
-                    <BadgeCard icon={<Shield className="h-8 w-8 text-blue-500" />} title="Protector" description="Maintain a 7-day streak" achieved={true} />
-                    <BadgeCard icon={<Target className="h-8 w-8 text-red-500" />} title="Sharpshooter" description="Get 100% on a quiz" achieved={true} />
-                    <BadgeCard icon={<Star className="h-8 w-8 text-purple-500" />} title="Super Star" description="Earn 1000 XP" achieved={true} />
-                    <BadgeCard icon={<Crown className="h-8 w-8 text-slate-300" />} title="Scholar King" description="Reach Level 10" achieved={false} />
-                    <BadgeCard icon={<Award className="h-8 w-8 text-slate-300" />} title="Math Whiz" description="Complete all Math modules" achieved={false} />
+                    {allBadges.map((badge, i) => (
+                        <BadgeCard key={i} icon={badge.icon} title={badge.title} description={badge.description} achieved={badge.achieved} />
+                    ))}
                 </div>
             </section>
 
@@ -89,10 +133,12 @@ export default function AchievementsPage() {
                     ))}
                     {/* User Rank */}
                     <div className="flex items-center gap-4 p-4 bg-violet-50 border-t border-violet-100">
-                        <div className="h-8 w-8 rounded-full flex items-center justify-center font-bold text-violet-700">8</div>
-                        <div className="h-10 w-10 rounded-full bg-violet-200 border-2 border-white flex items-center justify-center text-violet-700 font-bold">JS</div>
+                        <div className="h-8 w-8 rounded-full flex items-center justify-center font-bold text-violet-700">{Math.max(1, 10 - level)}</div>
+                        <div className="h-10 w-10 rounded-full bg-violet-200 border-2 border-white flex items-center justify-center text-violet-700 font-bold">
+                            {(selectedStudent?.name ?? "S").split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)}
+                        </div>
                         <div className="flex-1 font-bold text-slate-900">You</div>
-                        <div className="font-mono text-sm font-bold text-violet-700">1,250 XP</div>
+                        <div className="font-mono text-sm font-bold text-violet-700">{xp.toLocaleString()} XP</div>
                     </div>
                 </div>
             </section>

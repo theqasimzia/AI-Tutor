@@ -14,11 +14,13 @@ import {
     Menu,
     Gamepad2,
     Settings,
-    Sparkles
+    Sparkles,
+    ChevronDown
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { StudentProvider, useStudent } from "@/lib/student-context"
 
 const sidebarItems = [
     { name: "Dashboard", href: "/student/dashboard", icon: LayoutDashboard },
@@ -28,17 +30,17 @@ const sidebarItems = [
     { name: "Profile", href: "/student/profile", icon: User },
 ]
 
-export default function StudentLayout({
-    children,
-}: {
-    children: React.ReactNode
-}) {
+function StudentLayoutInner({ children }: { children: React.ReactNode }) {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false)
     const pathname = usePathname()
     const { data: session } = useSession()
+    const { students, selectedStudent, setSelectedStudentId } = useStudent()
 
     const userName = session?.user?.name || "Student"
     const initials = userName.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)
+
+    const studentXp = selectedStudent?.xp ?? 0
+    const level = Math.floor(studentXp / 500) + 1
 
     return (
         <div className="min-h-screen bg-slate-50 flex font-sans">
@@ -137,10 +139,25 @@ export default function StudentLayout({
                     </button>
 
                     <div className="flex items-center gap-4 ml-auto">
+                        {/* Student Selector */}
+                        {students.length > 1 && (
+                            <div className="hidden md:flex items-center">
+                                <select
+                                    value={selectedStudent?.id ?? ""}
+                                    onChange={(e) => setSelectedStudentId(e.target.value)}
+                                    className="text-sm font-medium text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                >
+                                    {students.map((s) => (
+                                        <option key={s.id} value={s.id}>{s.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+
                         <div className="hidden md:flex items-center gap-6 mr-6">
                             <div className="flex flex-col items-end">
                                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Current Level</span>
-                                <span className="text-sm font-bold text-slate-900">Level 4 Scholar</span>
+                                <span className="text-sm font-bold text-slate-900">Level {level} Scholar</span>
                             </div>
                             <div className="h-8 w-[1px] bg-slate-200" />
                         </div>
@@ -151,7 +168,7 @@ export default function StudentLayout({
                             </div>
                             <div className="flex flex-col leading-none">
                                 <span className="text-[10px] uppercase font-bold text-slate-400">Total XP</span>
-                                <span className="text-sm font-bold text-slate-900">1,250</span>
+                                <span className="text-sm font-bold text-slate-900">{studentXp.toLocaleString()}</span>
                             </div>
                         </div>
 
@@ -166,5 +183,13 @@ export default function StudentLayout({
                 </div>
             </main>
         </div>
+    )
+}
+
+export default function StudentLayout({ children }: { children: React.ReactNode }) {
+    return (
+        <StudentProvider>
+            <StudentLayoutInner>{children}</StudentLayoutInner>
+        </StudentProvider>
     )
 }

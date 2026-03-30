@@ -1,49 +1,60 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Users, BookOpen, CheckCircle, DollarSign, MoreHorizontal } from "lucide-react"
+import { Users, BookOpen, CheckCircle, DollarSign } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { getAdminDashboardStats } from "@/lib/queries/admin"
 
-const recentSignups = [
-    { name: "Alice Smith", email: "alice@example.com", role: "Student", date: "2023-10-23" },
-    { name: "Bob Jones", email: "bob@example.com", role: "Parent", date: "2023-10-22" },
-    { name: "Charlie Brown", email: "charlie@example.com", role: "Student", date: "2023-10-21" },
-    { name: "Diana Prince", email: "diana@example.com", role: "Student", date: "2023-10-21" },
-]
+type StatsData = Awaited<ReturnType<typeof getAdminDashboardStats>>
 
 export default function AdminDashboard() {
+    const [data, setData] = useState<StatsData | null>(null)
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => {
+        getAdminDashboardStats().then((d) => {
+            setData(d)
+            setLoading(false)
+        })
+    }, [])
+
+    if (loading || !data) {
+        return (
+            <div className="space-y-8 animate-pulse">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {[1, 2, 3, 4].map(i => <div key={i} className="h-32 bg-slate-200 rounded-xl" />)}
+                </div>
+            </div>
+        )
+    }
+
     return (
         <div className="space-y-8">
             {/* Stats Row */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <StatCard
                     title="Total Users"
-                    value="2,350"
-                    subtext="+180 from last month"
+                    value={data.totalUsers.toLocaleString()}
+                    subtext={`${data.totalStudents} students`}
                     icon={<Users className="h-4 w-4 text-slate-500" />}
                 />
                 <StatCard
                     title="Active Learners"
-                    value="1,203"
-                    subtext="+20.1% from last month"
+                    value={data.totalStudents.toLocaleString()}
+                    subtext="Registered students"
                     icon={<CheckCircle className="h-4 w-4 text-slate-500" />}
                 />
                 <StatCard
                     title="Completed Lessons"
-                    value="12,234"
-                    subtext="+19% from last month"
+                    value={data.totalCompletedLessons.toLocaleString()}
+                    subtext="Total across platform"
                     icon={<BookOpen className="h-4 w-4 text-slate-500" />}
                 />
                 <StatCard
                     title="Revenue"
-                    value="$45,231.89"
-                    subtext="+20.1% from last month"
+                    value="$0.00"
+                    subtext="Stripe not integrated yet"
                     icon={<DollarSign className="h-4 w-4 text-slate-500" />}
                 />
             </div>
@@ -65,25 +76,28 @@ export default function AdminDashboard() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {recentSignups.map((user, i) => (
-                                <tr key={i} className="bg-white hover:bg-slate-50 transition-colors">
-                                    <td className="px-6 py-4 font-medium text-slate-900">{user.name}</td>
+                            {data.recentSignups.map((user) => (
+                                <tr key={user.id} className="bg-white hover:bg-slate-50 transition-colors">
+                                    <td className="px-6 py-4 font-medium text-slate-900">{user.name ?? "—"}</td>
                                     <td className="px-6 py-4 text-slate-500">{user.email}</td>
                                     <td className="px-6 py-4">
-                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${user.role === 'Student' ? 'bg-indigo-100 text-indigo-800' : 'bg-green-100 text-green-800'
-                                            }`}>
+                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${user.role === 'ADMIN' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
                                             {user.role}
                                         </span>
                                     </td>
-                                    <td className="px-6 py-4 text-slate-500">{user.date}</td>
+                                    <td className="px-6 py-4 text-slate-500">{new Date(user.createdAt).toLocaleDateString()}</td>
                                     <td className="px-6 py-4 text-right">
                                         <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                            <span className="sr-only">Open menu</span>
                                             <span className="font-bold text-xs text-blue-600">Edit</span>
                                         </Button>
                                     </td>
                                 </tr>
                             ))}
+                            {data.recentSignups.length === 0 && (
+                                <tr>
+                                    <td colSpan={5} className="px-6 py-8 text-center text-slate-500">No users yet.</td>
+                                </tr>
+                            )}
                         </tbody>
                     </table>
                 </div>

@@ -5,6 +5,8 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Calculator, Zap, Play, RotateCcw, Trophy } from "lucide-react"
+import { useStudent } from "@/lib/student-context"
+import { submitGameScore } from "@/app/actions/student-actions"
 
 type Asteroid = {
     id: number
@@ -118,11 +120,11 @@ export default function MathBlasterPage() {
         setInputValue("")
     }
 
-    // Save Score
+    const { selectedStudent } = useStudent()
+
     useEffect(() => {
-        if (gameState === 'gameover') {
-            const currentXP = parseInt(localStorage.getItem('student_xp') || '1250')
-            localStorage.setItem('student_xp', (currentXP + score).toString())
+        if (gameState === "gameover" && score > 0 && selectedStudent?.id) {
+            submitGameScore(selectedStudent.id, "math-blaster", score, score)
         }
     }, [gameState])
 

@@ -1,13 +1,35 @@
 "use client"
 
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { User, Lock, Bell, Sparkles } from "lucide-react"
+import { useStudent } from "@/lib/student-context"
+import { updateStudentProfile } from "@/app/actions/student-actions"
 
 export default function ProfilePage() {
+    const { selectedStudent } = useStudent()
+    const [saving, setSaving] = useState(false)
+    const [name, setName] = useState("")
+
+    const studentName = selectedStudent?.name ?? "Student"
+    const nameParts = studentName.split(" ")
+    const firstName = nameParts[0] ?? ""
+    const lastName = nameParts.slice(1).join(" ") ?? ""
+    const initials = studentName.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)
+    const grade = selectedStudent?.grade ?? "Not set"
+
+    const handleSave = async () => {
+        if (!selectedStudent?.id) return
+        setSaving(true)
+        const fullName = name.trim() || studentName
+        await updateStudentProfile(selectedStudent.id, { name: fullName })
+        setSaving(false)
+    }
+
     return (
         <div className="max-w-4xl mx-auto space-y-8">
             <h1 className="text-3xl font-bold tracking-tight text-slate-900">Account Settings</h1>
@@ -28,7 +50,7 @@ export default function ProfilePage() {
                         <CardContent className="space-y-4">
                             <div className="flex items-center gap-6 mb-6">
                                 <div className="h-24 w-24 rounded-full bg-violet-100 flex items-center justify-center text-3xl font-bold text-violet-600 border-4 border-white shadow-lg">
-                                    JS
+                                    {initials}
                                 </div>
                                 <Button variant="outline">Change Avatar</Button>
                             </div>
@@ -36,18 +58,28 @@ export default function ProfilePage() {
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="firstName">First name</Label>
-                                    <Input id="firstName" defaultValue="John" />
+                                    <Input
+                                        id="firstName"
+                                        defaultValue={firstName}
+                                        onChange={(e) => setName(`${e.target.value} ${lastName}`)}
+                                    />
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="lastName">Last name</Label>
-                                    <Input id="lastName" defaultValue="Smith" />
+                                    <Input
+                                        id="lastName"
+                                        defaultValue={lastName}
+                                        onChange={(e) => setName(`${firstName} ${e.target.value}`)}
+                                    />
                                 </div>
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="email">Email</Label>
-                                <Input id="email" type="email" defaultValue="john.smith@student.com" readOnly className="bg-slate-50" />
+                                <Input id="email" type="email" defaultValue={`${firstName.toLowerCase()}.${lastName.toLowerCase()}@student.com`} readOnly className="bg-slate-50" />
                             </div>
-                            <Button className="mt-4">Save Changes</Button>
+                            <Button className="mt-4" onClick={handleSave} disabled={saving}>
+                                {saving ? "Saving..." : "Save Changes"}
+                            </Button>
                         </CardContent>
                     </Card>
 
@@ -58,7 +90,7 @@ export default function ProfilePage() {
                         <CardContent>
                             <div className="flex items-center justify-between p-4 border border-slate-200 rounded-xl bg-slate-50">
                                 <div className="space-y-1">
-                                    <p className="font-bold text-slate-900">Key Stage 2 (Year 5)</p>
+                                    <p className="font-bold text-slate-900">Key Stage 2 ({grade})</p>
                                     <p className="text-sm text-slate-500">Standard UK Curriculum</p>
                                 </div>
                                 <Button variant="secondary" size="sm">Change Level</Button>
