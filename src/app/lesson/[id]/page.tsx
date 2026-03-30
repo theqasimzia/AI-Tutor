@@ -1,516 +1,543 @@
 "use client"
 
-import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
-import { ArrowLeft, BookOpen, CheckCircle2, XCircle, Play, ChevronRight, Award, Sparkles, RotateCcw } from "lucide-react"
-import { motion, AnimatePresence } from "framer-motion"
-import { useState, useEffect, useCallback } from "react"
+import { useChat, type UIMessage } from "@ai-sdk/react"
+import { DefaultChatTransport } from "ai"
 import { useSession } from "next-auth/react"
+import { useState, useEffect, useRef, useMemo, FormEvent } from "react"
+import {
+  ArrowLeft,
+  Send,
+  Sparkles,
+  Award,
+  CheckCircle2,
+  XCircle,
+  Gamepad2,
+} from "lucide-react"
+import { motion } from "framer-motion"
 
 import { Button } from "@/components/ui/button"
-import { toast } from "sonner"
+import { Input } from "@/components/ui/input"
 import { getLessonById } from "@/lib/queries/curriculum"
-import { completeLesson, startLesson } from "@/app/actions/student-actions"
-import { getLessonContent } from "@/lib/lesson-content"
 import { getStudentsByParentId } from "@/lib/queries/student"
+import { createTutorSession } from "@/app/actions/tutor-actions"
 
-type Phase = "loading" | "intro" | "content" | "quiz" | "results"
+type QuizData = {
+  question: string
+  options: string[]
+  correctIndex: number
+  hint: string
+  bloomLevel: number
+}
+
+type GameData = {
+  gameType: string
+  title: string
+  items: { question: string; answer: string; distractors?: string[] }[]
+  difficulty: string
+}
+
+type SessionEndData = {
+  summary: string
+  score: number
+  recommendation: string
+}
+
+function getTextFromMessage(msg: UIMessage): string {
+  return msg.parts
+    .filter((p): p is { type: "text"; text: string } => p.type === "text")
+    .map((p) => p.text)
+    .join("")
+}
 
 export default function LessonPage() {
-    const params = useParams()
-    const router = useRouter()
-    const { data: session } = useSession()
+  const params = useParams()
+  const router = useRouter()
+  const { data: session } = useSession()
+  const lessonId = params.id?.toString() ?? ""
 
-    const lessonId = params.id?.toString() ?? ""
+  const [studentId, setStudentId] = useState<string | null>(null)
+  const [tutorSessionId, setTutorSessionId] = useState<string | null>(null)
+  const [lessonTitle, setLessonTitle] = useState("Lesson")
+  const [subjectName, setSubjectName] = useState("Subject")
+  const [keyStage, setKeyStage] = useState("")
+  const [ready, setReady] = useState(false)
 
-    const [phase, setPhase] = useState<Phase>("loading")
-    const [lessonData, setLessonData] = useState<Awaited<ReturnType<typeof getLessonById>>>(null)
-    const [studentId, setStudentId] = useState<string | null>(null)
+  const [inputValue, setInputValue] = useState("")
+  const [activeQuiz, setActiveQuiz] = useState<QuizData | null>(null)
+  const [quizAnswer, setQuizAnswer] = useState<number | null>(null)
+  const [showQuizResult, setShowQuizResult] = useState(false)
+  const [activeGame, setActiveGame] = useState<GameData | null>(null)
+  const [sessionEnd, setSessionEnd] = useState<SessionEndData | null>(null)
 
-    const [currentQuestion, setCurrentQuestion] = useState(0)
-    const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null)
-    const [answers, setAnswers] = useState<number[]>([])
-    const [showExplanation, setShowExplanation] = useState(false)
-    const [score, setScore] = useState(0)
-    const [xpAwarded, setXpAwarded] = useState(0)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const initSent = useRef(false)
 
-    const content = getLessonContent(lessonData?.title ?? "")
-    const quiz = content.quiz
+  useEffect(() => {
+    if (!lessonId || !session?.user?.id) return
 
-    useEffect(() => {
-        if (!lessonId || !session?.user?.id) return
+    Promise.all([
+      getLessonById(lessonId),
+      getStudentsByParentId(session.user.id),
+    ]).then(async ([lesson, students]) => {
+      if (lesson) {
+        setLessonTitle(lesson.title)
+        setSubjectName(lesson.module?.subject?.name ?? "Subject")
+        setKeyStage(lesson.module?.subject?.keyStage ?? "")
+      }
+      if (students.length > 0) {
+        const sid = students[0].id
+        setStudentId(sid)
+        const ts = await createTutorSession(sid, lessonId)
+        setTutorSessionId(ts.id)
+        setReady(true)
+      }
+    })
+  }, [lessonId, session?.user?.id])
 
-        Promise.all([
-            getLessonById(lessonId),
-            getStudentsByParentId(session.user.id),
-        ]).then(([lesson, students]) => {
-            setLessonData(lesson)
-            if (students.length > 0) {
-                setStudentId(students[0].id)
-            }
-            setPhase("intro")
-        })
-    }, [lessonId, session?.user?.id])
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport({
+        api: "/api/tutor/chat",
+        body: { sessionId: tutorSessionId, studentId, lessonId },
+      }),
+    [tutorSessionId, studentId, lessonId]
+  )
 
-    const handleStartLesson = useCallback(async () => {
-        if (studentId && lessonId) {
-            try {
-                await startLesson(studentId, lessonId)
-            } catch {
-                // Non-blocking — lesson can still proceed
-            }
-        }
-        setPhase("content")
-    }, [studentId, lessonId])
+  const { messages, sendMessage, status } = useChat({
+    transport,
+    onToolCall({ toolCall }) {
+      const toolInput = toolCall.input as Record<string, unknown>
+      if (toolCall.toolName === "generate_quiz") {
+        setActiveQuiz(toolInput as unknown as QuizData)
+      }
+      if (toolCall.toolName === "launch_game") {
+        setActiveGame(toolInput as unknown as GameData)
+      }
+      if (toolCall.toolName === "end_session") {
+        setSessionEnd(toolInput as unknown as SessionEndData)
+      }
+    },
+  })
 
-    const handleStartQuiz = () => {
-        setPhase("quiz")
-        setCurrentQuestion(0)
-        setSelectedAnswer(null)
-        setAnswers([])
-        setShowExplanation(false)
+  const isLoading = status === "submitted" || status === "streaming"
+
+  useEffect(() => {
+    if (ready && !initSent.current && studentId) {
+      initSent.current = true
+      sendMessage({ text: "Hi! I'm ready to learn." })
     }
+  }, [ready, studentId, sendMessage])
 
-    const handleSelectAnswer = (idx: number) => {
-        if (showExplanation) return
-        setSelectedAnswer(idx)
-    }
+  useEffect(() => {
+    scrollRef.current?.scrollTo({
+      top: scrollRef.current.scrollHeight,
+      behavior: "smooth",
+    })
+  }, [messages, activeQuiz, activeGame])
 
-    const handleConfirmAnswer = () => {
-        if (selectedAnswer === null) return
-        setShowExplanation(true)
-        setAnswers((prev) => [...prev, selectedAnswer])
-    }
+  const handleFormSubmit = (e: FormEvent) => {
+    e.preventDefault()
+    if (!inputValue.trim() || isLoading || activeQuiz || activeGame) return
+    sendMessage({ text: inputValue })
+    setInputValue("")
+  }
 
-    const handleNextQuestion = async () => {
-        setShowExplanation(false)
-        setSelectedAnswer(null)
+  const handleQuizAnswer = (idx: number) => {
+    if (showQuizResult || !activeQuiz) return
+    setQuizAnswer(idx)
+  }
 
-        if (currentQuestion + 1 < quiz.length) {
-            setCurrentQuestion((prev) => prev + 1)
-        } else {
-            const allAnswers = [...answers]
-            if (selectedAnswer !== null && allAnswers.length < quiz.length) {
-                allAnswers.push(selectedAnswer)
-            }
-            const correct = allAnswers.filter((a, i) => a === quiz[i]?.correctIndex).length
-            const pct = quiz.length > 0 ? Math.round((correct / quiz.length) * 100) : 100
+  const handleQuizSubmit = () => {
+    if (quizAnswer === null || !activeQuiz) return
+    setShowQuizResult(true)
+    const correct = quizAnswer === activeQuiz.correctIndex
 
-            setScore(pct)
+    setTimeout(() => {
+      const answer = activeQuiz.options[quizAnswer]
+      const correctAnswer = activeQuiz.options[activeQuiz.correctIndex]
+      setActiveQuiz(null)
+      setQuizAnswer(null)
+      setShowQuizResult(false)
+      sendMessage({
+        text: correct
+          ? `I answered "${answer}" and it was CORRECT.`
+          : `I answered "${answer}" but the correct answer was "${correctAnswer}".`,
+      })
+    }, 2000)
+  }
 
-            if (studentId && lessonId) {
-                try {
-                    const result = await completeLesson(studentId, lessonId, pct)
-                    setXpAwarded(result.xpAwarded)
-                    toast.success(`Lesson completed! +${result.xpAwarded} XP`)
-                } catch {
-                    toast.error("Could not save progress")
-                }
-            }
+  const handleGameComplete = (score: number) => {
+    const title = activeGame?.title
+    const total = activeGame?.items.length
+    setActiveGame(null)
+    sendMessage({
+      text: `I completed the game "${title}" and scored ${score} out of ${total}.`,
+    })
+  }
 
-            setPhase("results")
-        }
-    }
-
-    const lessonTitle = lessonData?.title ?? "Lesson"
-    const subjectName = lessonData?.module?.subject?.name ?? "Subject"
-    const keyStage = lessonData?.module?.subject?.keyStage ?? ""
-    const subjectColor = lessonData?.module?.subject?.color ?? "blue"
-    const colorClass = subjectColor === "blue" ? "from-blue-500 to-blue-600" : subjectColor === "pink" ? "from-pink-500 to-pink-600" : "from-orange-500 to-orange-600"
-
-    if (phase === "loading") {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-slate-50">
-                <div className="text-center space-y-4">
-                    <div className="h-16 w-16 rounded-full bg-slate-200 animate-pulse mx-auto" />
-                    <p className="text-slate-500 font-medium">Loading lesson...</p>
-                </div>
-            </div>
-        )
-    }
-
+  if (!ready) {
     return (
-        <div className="min-h-screen bg-slate-50 relative overflow-hidden">
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-violet-100/50 via-slate-50 to-slate-50 -z-10" />
-
-            {/* Header */}
-            <header className="h-16 flex items-center justify-between px-4 md:px-8 border-b border-slate-200/60 bg-white/70 backdrop-blur-md sticky top-0 z-50">
-                <div className="flex items-center gap-4">
-                    <Button variant="ghost" size="icon" className="rounded-full hover:bg-slate-100" onClick={() => router.push("/student/lessons")} aria-label="Back to lessons">
-                        <ArrowLeft className="h-5 w-5 text-slate-600" />
-                    </Button>
-                    <div>
-                        <h1 className="font-bold text-slate-800 text-lg leading-tight">{lessonTitle}</h1>
-                        <p className="text-xs text-slate-500 font-medium">{subjectName} {keyStage && `• ${keyStage}`}</p>
-                    </div>
-                </div>
-                <div className="flex items-center gap-2">
-                    {phase !== "intro" && (
-                        <div className="flex items-center gap-2 text-sm text-slate-500 bg-slate-100 px-3 py-1 rounded-full">
-                            <span className="font-bold capitalize">{phase === "content" ? "Learning" : phase === "quiz" ? `Question ${currentQuestion + 1}/${quiz.length}` : "Complete"}</span>
-                        </div>
-                    )}
-                    <Button variant="outline" size="sm" className="rounded-full" onClick={() => router.push("/student/dashboard")}>
-                        Exit
-                    </Button>
-                </div>
-            </header>
-
-            <main className="max-w-4xl mx-auto px-4 py-8 md:py-12">
-                <AnimatePresence mode="wait">
-                    {phase === "intro" && (
-                        <IntroPhase
-                            key="intro"
-                            title={lessonTitle}
-                            subject={subjectName}
-                            keyStage={keyStage}
-                            description={lessonData?.description ?? ""}
-                            introduction={content.introduction}
-                            questionCount={quiz.length}
-                            colorClass={colorClass}
-                            onStart={handleStartLesson}
-                        />
-                    )}
-                    {phase === "content" && (
-                        <ContentPhase
-                            key="content"
-                            content={content}
-                            colorClass={colorClass}
-                            onStartQuiz={handleStartQuiz}
-                        />
-                    )}
-                    {phase === "quiz" && (
-                        <QuizPhase
-                            key={`quiz-${currentQuestion}`}
-                            question={quiz[currentQuestion]}
-                            questionIndex={currentQuestion}
-                            totalQuestions={quiz.length}
-                            selectedAnswer={selectedAnswer}
-                            showExplanation={showExplanation}
-                            onSelectAnswer={handleSelectAnswer}
-                            onConfirm={handleConfirmAnswer}
-                            onNext={handleNextQuestion}
-                        />
-                    )}
-                    {phase === "results" && (
-                        <ResultsPhase
-                            key="results"
-                            score={score}
-                            xpAwarded={xpAwarded}
-                            totalQuestions={quiz.length}
-                            answers={answers}
-                            quiz={quiz}
-                            onRetry={() => {
-                                setPhase("content")
-                                setAnswers([])
-                                setCurrentQuestion(0)
-                                setScore(0)
-                            }}
-                        />
-                    )}
-                </AnimatePresence>
-            </main>
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+        <div className="space-y-4 text-center">
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+            className="mx-auto h-16 w-16 rounded-full border-4 border-violet-200 border-t-violet-600"
+          />
+          <p className="font-medium text-slate-500">
+            Preparing your lesson...
+          </p>
         </div>
+      </div>
     )
-}
+  }
 
-function IntroPhase({ title, subject, keyStage, description, introduction, questionCount, colorClass, onStart }: {
-    title: string; subject: string; keyStage: string; description: string; introduction: string; questionCount: number; colorClass: string; onStart: () => void
-}) {
+  if (sessionEnd) {
     return (
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-8">
-            <div className={`bg-gradient-to-br ${colorClass} rounded-3xl p-8 md:p-12 text-white shadow-xl relative overflow-hidden`}>
-                <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-                <div className="relative z-10 space-y-4">
-                    <div className="inline-flex items-center gap-2 bg-white/20 px-3 py-1 rounded-full text-xs font-bold">
-                        <BookOpen className="h-3 w-3" /> {subject} {keyStage && `• ${keyStage}`}
-                    </div>
-                    <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight">{title}</h2>
-                    {description && <p className="text-white/80 text-lg max-w-2xl">{description}</p>}
-                </div>
-            </div>
-
-            <div className="bg-white rounded-2xl border border-slate-200 p-6 md:p-8 shadow-sm space-y-4">
-                <h3 className="font-bold text-xl text-slate-800">What you&apos;ll learn</h3>
-                <p className="text-slate-600 leading-relaxed">{introduction}</p>
-
-                <div className="flex flex-wrap gap-4 pt-4">
-                    <div className="flex items-center gap-2 bg-slate-50 px-4 py-2 rounded-xl text-sm font-medium text-slate-600">
-                        <BookOpen className="h-4 w-4 text-violet-500" /> Interactive lesson
-                    </div>
-                    <div className="flex items-center gap-2 bg-slate-50 px-4 py-2 rounded-xl text-sm font-medium text-slate-600">
-                        <CheckCircle2 className="h-4 w-4 text-green-500" /> {questionCount} quiz questions
-                    </div>
-                    <div className="flex items-center gap-2 bg-slate-50 px-4 py-2 rounded-xl text-sm font-medium text-slate-600">
-                        <Award className="h-4 w-4 text-amber-500" /> Earn XP
-                    </div>
-                </div>
-            </div>
-
-            <div className="flex justify-center">
-                <Button onClick={onStart} size="lg" className="h-14 px-10 rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-bold text-lg shadow-lg shadow-violet-200 transition-transform hover:scale-105 active:scale-95">
-                    <Play className="mr-2 h-5 w-5 fill-current" /> Start Lesson
-                </Button>
-            </div>
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
+        <motion.div
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="w-full max-w-lg space-y-6"
+        >
+          <div className="rounded-3xl bg-gradient-to-br from-green-500 to-emerald-600 p-8 text-center text-white shadow-xl">
+            <Award className="mx-auto mb-4 h-16 w-16 text-yellow-300" />
+            <h2 className="text-3xl font-extrabold">Lesson Complete!</h2>
+            <p className="mt-2 text-white/80">Score: {sessionEnd.score}%</p>
+            <p className="text-white/80">
+              +{Math.round(sessionEnd.score * 1.5)} XP
+            </p>
+          </div>
+          <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h3 className="font-bold text-slate-800">Summary</h3>
+            <p className="text-slate-600">{sessionEnd.summary}</p>
+            <h3 className="pt-2 font-bold text-slate-800">
+              What to focus on next
+            </h3>
+            <p className="text-slate-600">{sessionEnd.recommendation}</p>
+          </div>
+          <div className="flex gap-3">
+            <Button
+              onClick={() => router.push("/student/lessons")}
+              className="h-12 flex-1 rounded-full bg-violet-600 font-bold text-white hover:bg-violet-700"
+            >
+              Back to Curriculum
+            </Button>
+            <Button
+              onClick={() => router.push("/student/dashboard")}
+              variant="outline"
+              className="h-12 flex-1 rounded-full font-bold"
+            >
+              Dashboard
+            </Button>
+          </div>
         </motion.div>
+      </div>
     )
+  }
+
+  return (
+    <div className="flex min-h-screen flex-col bg-slate-50">
+      <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-slate-200/60 bg-white/80 px-4 backdrop-blur-md">
+        <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="rounded-full"
+            onClick={() => router.push("/student/lessons")}
+            aria-label="Back"
+          >
+            <ArrowLeft className="h-5 w-5 text-slate-600" />
+          </Button>
+          <div>
+            <h1 className="text-sm font-bold leading-tight text-slate-800">
+              {lessonTitle}
+            </h1>
+            <p className="text-xs text-slate-500">
+              {subjectName} {keyStage && `\u2022 ${keyStage}`}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1 text-xs font-medium text-green-700">
+            <Sparkles className="h-3 w-3" /> AI Tutor
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="rounded-full text-xs"
+            onClick={() => router.push("/student/dashboard")}
+          >
+            Exit
+          </Button>
+        </div>
+      </header>
+
+      <div
+        ref={scrollRef}
+        className="mx-auto w-full max-w-3xl flex-1 space-y-4 overflow-y-auto px-4 py-6"
+      >
+        {messages
+          .filter((m) => m.role === "user" || m.role === "assistant")
+          .map((m) => {
+            const text = getTextFromMessage(m)
+            if (!text) return null
+            return (
+              <ChatBubble
+                key={m.id}
+                role={m.role as "user" | "assistant"}
+                content={text}
+              />
+            )
+          })}
+
+        {activeQuiz && (
+          <QuizCard
+            quiz={activeQuiz}
+            selectedAnswer={quizAnswer}
+            showResult={showQuizResult}
+            onSelect={handleQuizAnswer}
+            onSubmit={handleQuizSubmit}
+          />
+        )}
+
+        {activeGame && (
+          <MiniGame game={activeGame} onComplete={handleGameComplete} />
+        )}
+
+        {isLoading && !activeQuiz && !activeGame && (
+          <div className="flex items-center gap-2 pl-12 text-sm text-slate-400">
+            <motion.div
+              animate={{ opacity: [0.3, 1, 0.3] }}
+              transition={{ duration: 1.5, repeat: Infinity }}
+              className="flex gap-1"
+            >
+              <span className="h-2 w-2 rounded-full bg-violet-400" />
+              <span className="h-2 w-2 rounded-full bg-violet-400" />
+              <span className="h-2 w-2 rounded-full bg-violet-400" />
+            </motion.div>
+            <span>Thinking...</span>
+          </div>
+        )}
+      </div>
+
+      <div className="sticky bottom-0 border-t border-slate-200 bg-white/90 px-4 py-3 backdrop-blur-md">
+        <form onSubmit={handleFormSubmit} className="mx-auto flex max-w-3xl gap-2">
+          <Input
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            placeholder="Type your answer or ask a question..."
+            className="h-12 flex-1 rounded-full border-slate-200 bg-slate-50 px-5 text-base"
+            disabled={isLoading || !!activeQuiz || !!activeGame}
+          />
+          <Button
+            type="submit"
+            size="icon"
+            className="h-12 w-12 shrink-0 rounded-full bg-violet-600 hover:bg-violet-700"
+            disabled={
+              isLoading || !inputValue.trim() || !!activeQuiz || !!activeGame
+            }
+          >
+            <Send className="h-5 w-5" />
+          </Button>
+        </form>
+      </div>
+    </div>
+  )
 }
 
-function ContentPhase({ content, colorClass, onStartQuiz }: {
-    content: ReturnType<typeof getLessonContent>; colorClass: string; onStartQuiz: () => void
+function ChatBubble({
+  role,
+  content,
+}: {
+  role: "user" | "assistant"
+  content: string
 }) {
-    return (
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-8">
-            <div className="bg-white rounded-2xl border border-slate-200 p-6 md:p-8 shadow-sm space-y-6">
-                <h3 className="text-2xl font-bold text-slate-800">Key Concepts</h3>
-                <p className="text-slate-600 leading-relaxed text-lg">{content.introduction}</p>
+  const isAI = role === "assistant"
 
-                <div className="space-y-3">
-                    {content.keyPoints.map((point, i) => (
-                        <motion.div
-                            key={i}
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: i * 0.15 }}
-                            className="flex items-start gap-3 p-3 rounded-xl bg-violet-50 border border-violet-100"
-                        >
-                            <div className="h-7 w-7 rounded-full bg-violet-200 text-violet-700 flex items-center justify-center text-sm font-bold shrink-0 mt-0.5">
-                                {i + 1}
-                            </div>
-                            <p className="text-slate-700 font-medium">{point}</p>
-                        </motion.div>
-                    ))}
-                </div>
-            </div>
-
-            {content.examples.length > 0 && (
-                <div className="bg-white rounded-2xl border border-slate-200 p-6 md:p-8 shadow-sm space-y-6">
-                    <h3 className="text-2xl font-bold text-slate-800">Worked Examples</h3>
-                    <div className="space-y-4">
-                        {content.examples.map((ex, i) => (
-                            <motion.div
-                                key={i}
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 0.3 + i * 0.15 }}
-                                className={`p-5 rounded-xl bg-gradient-to-r ${colorClass} text-white`}
-                            >
-                                <h4 className="font-bold text-lg mb-2">{ex.title}</h4>
-                                <p className="text-white/90">{ex.content}</p>
-                            </motion.div>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            <div className="flex justify-center pt-4">
-                <Button onClick={onStartQuiz} size="lg" className="h-14 px-10 rounded-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold text-lg shadow-lg shadow-green-200 transition-transform hover:scale-105 active:scale-95">
-                    I&apos;m Ready — Start Quiz <ChevronRight className="ml-2 h-5 w-5" />
-                </Button>
-            </div>
-        </motion.div>
-    )
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={`flex ${isAI ? "justify-start" : "justify-end"}`}
+    >
+      <div
+        className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+          isAI
+            ? "rounded-tl-sm border border-slate-200 bg-white text-slate-800 shadow-sm"
+            : "rounded-tr-sm bg-violet-600 text-white"
+        }`}
+      >
+        {isAI && (
+          <div className="mb-1 flex items-center gap-1.5 text-xs font-bold text-violet-600">
+            <Sparkles className="h-3 w-3" /> AI Tutor
+          </div>
+        )}
+        {content}
+      </div>
+    </motion.div>
+  )
 }
 
-function QuizPhase({ question, questionIndex, totalQuestions, selectedAnswer, showExplanation, onSelectAnswer, onConfirm, onNext }: {
-    question: { question: string; options: string[]; correctIndex: number; explanation: string }
-    questionIndex: number; totalQuestions: number; selectedAnswer: number | null
-    showExplanation: boolean; onSelectAnswer: (i: number) => void; onConfirm: () => void; onNext: () => void
+function QuizCard({
+  quiz,
+  selectedAnswer,
+  showResult,
+  onSelect,
+  onSubmit,
+}: {
+  quiz: QuizData
+  selectedAnswer: number | null
+  showResult: boolean
+  onSelect: (i: number) => void
+  onSubmit: () => void
 }) {
-    const isCorrect = selectedAnswer === question.correctIndex
-    const isLast = questionIndex + 1 >= totalQuestions
+  const isCorrect = selectedAnswer === quiz.correctIndex
 
-    return (
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-8">
-            {/* Progress bar */}
-            <div className="space-y-2">
-                <div className="flex justify-between text-sm font-bold text-slate-500">
-                    <span>Question {questionIndex + 1} of {totalQuestions}</span>
-                    <span>{Math.round(((questionIndex) / totalQuestions) * 100)}% complete</span>
-                </div>
-                <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
-                    <motion.div
-                        initial={{ width: `${((questionIndex) / totalQuestions) * 100}%` }}
-                        animate={{ width: `${((questionIndex + 1) / totalQuestions) * 100}%` }}
-                        className="h-full bg-gradient-to-r from-violet-500 to-indigo-500 rounded-full"
-                    />
-                </div>
-            </div>
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="mx-auto max-w-lg space-y-4 rounded-2xl border-2 border-violet-200 bg-white p-5 shadow-md"
+    >
+      <div className="flex items-center gap-2 text-sm font-bold text-violet-600">
+        <CheckCircle2 className="h-4 w-4" /> Quiz Time!
+      </div>
+      <p className="text-lg font-bold text-slate-800">{quiz.question}</p>
 
-            <div className="bg-white rounded-2xl border border-slate-200 p-6 md:p-8 shadow-sm space-y-6">
-                <h3 className="text-xl md:text-2xl font-bold text-slate-800">{question.question}</h3>
+      <div className="space-y-2">
+        {quiz.options.map((opt, i) => {
+          let cls =
+            "border-slate-200 hover:border-violet-300 hover:bg-violet-50 cursor-pointer"
+          if (showResult) {
+            if (i === quiz.correctIndex) cls = "border-green-300 bg-green-50"
+            else if (i === selectedAnswer)
+              cls = "border-red-300 bg-red-50"
+            else cls = "border-slate-100 opacity-50"
+          } else if (selectedAnswer === i) {
+            cls = "border-violet-400 bg-violet-50 ring-2 ring-violet-200"
+          }
 
-                <div className="space-y-3">
-                    {question.options.map((option, i) => {
-                        let borderClass = "border-slate-200 hover:border-violet-300 hover:bg-violet-50"
-                        let bgClass = ""
-
-                        if (showExplanation) {
-                            if (i === question.correctIndex) {
-                                borderClass = "border-green-300"
-                                bgClass = "bg-green-50"
-                            } else if (i === selectedAnswer && i !== question.correctIndex) {
-                                borderClass = "border-red-300"
-                                bgClass = "bg-red-50"
-                            } else {
-                                borderClass = "border-slate-100 opacity-50"
-                            }
-                        } else if (selectedAnswer === i) {
-                            borderClass = "border-violet-400 ring-2 ring-violet-200"
-                            bgClass = "bg-violet-50"
-                        }
-
-                        return (
-                            <motion.button
-                                key={i}
-                                initial={{ opacity: 0, x: -10 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                transition={{ delay: i * 0.1 }}
-                                onClick={() => onSelectAnswer(i)}
-                                disabled={showExplanation}
-                                className={`w-full flex items-center gap-4 p-4 rounded-xl border-2 text-left transition-all ${borderClass} ${bgClass} ${showExplanation ? "cursor-default" : "cursor-pointer"}`}
-                            >
-                                <span className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-600 shrink-0">
-                                    {showExplanation && i === question.correctIndex ? (
-                                        <CheckCircle2 className="h-6 w-6 text-green-600" />
-                                    ) : showExplanation && i === selectedAnswer ? (
-                                        <XCircle className="h-6 w-6 text-red-500" />
-                                    ) : (
-                                        String.fromCharCode(65 + i)
-                                    )}
-                                </span>
-                                <span className="font-medium text-slate-700 text-lg">{option}</span>
-                            </motion.button>
-                        )
-                    })}
-                </div>
-
-                {showExplanation && (
-                    <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        className={`p-4 rounded-xl ${isCorrect ? "bg-green-50 border border-green-200" : "bg-amber-50 border border-amber-200"}`}
-                    >
-                        <p className={`font-bold mb-1 ${isCorrect ? "text-green-700" : "text-amber-700"}`}>
-                            {isCorrect ? "Correct! Well done!" : "Not quite right."}
-                        </p>
-                        <p className="text-slate-600">{question.explanation}</p>
-                    </motion.div>
-                )}
-            </div>
-
-            <div className="flex justify-center">
-                {!showExplanation ? (
-                    <Button
-                        onClick={onConfirm}
-                        disabled={selectedAnswer === null}
-                        size="lg"
-                        className="h-14 px-10 rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-bold text-lg shadow-lg shadow-violet-200 disabled:opacity-50 transition-transform hover:scale-105 active:scale-95"
-                    >
-                        Check Answer
-                    </Button>
+          return (
+            <button
+              key={i}
+              onClick={() => onSelect(i)}
+              disabled={showResult}
+              className={`flex w-full items-center gap-3 rounded-xl border-2 p-3 text-left transition-all ${cls}`}
+            >
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm font-bold text-slate-600">
+                {showResult && i === quiz.correctIndex ? (
+                  <CheckCircle2 className="h-5 w-5 text-green-600" />
+                ) : showResult && i === selectedAnswer ? (
+                  <XCircle className="h-5 w-5 text-red-500" />
                 ) : (
-                    <Button
-                        onClick={onNext}
-                        size="lg"
-                        className="h-14 px-10 rounded-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold text-lg shadow-lg shadow-green-200 transition-transform hover:scale-105 active:scale-95"
-                    >
-                        {isLast ? "See Results" : "Next Question"} <ChevronRight className="ml-2 h-5 w-5" />
-                    </Button>
+                  String.fromCharCode(65 + i)
                 )}
-            </div>
-        </motion.div>
-    )
+              </span>
+              <span className="font-medium text-slate-700">{opt}</span>
+            </button>
+          )
+        })}
+      </div>
+
+      {showResult && (
+        <div
+          className={`rounded-xl p-3 text-sm ${isCorrect ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-700"}`}
+        >
+          {isCorrect ? "Brilliant! Well done!" : `Not quite. ${quiz.hint}`}
+        </div>
+      )}
+
+      {!showResult && (
+        <Button
+          onClick={onSubmit}
+          disabled={selectedAnswer === null}
+          className="h-11 w-full rounded-full bg-violet-600 font-bold hover:bg-violet-700"
+        >
+          Check Answer
+        </Button>
+      )}
+    </motion.div>
+  )
 }
 
-function ResultsPhase({ score, xpAwarded, totalQuestions, answers, quiz, onRetry }: {
-    score: number; xpAwarded: number; totalQuestions: number
-    answers: number[]
-    quiz: { question: string; options: string[]; correctIndex: number; explanation: string }[]
-    onRetry: () => void
+function MiniGame({
+  game,
+  onComplete,
+}: {
+  game: GameData
+  onComplete: (score: number) => void
 }) {
-    const correct = answers.filter((a, i) => a === quiz[i]?.correctIndex).length
-    const passed = score >= 50
+  const [currentIdx, setCurrentIdx] = useState(0)
+  const [score, setScore] = useState(0)
+  const [answered, setAnswered] = useState(false)
 
-    return (
-        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="space-y-8">
-            <div className={`rounded-3xl p-8 md:p-12 text-white text-center relative overflow-hidden shadow-xl ${passed ? "bg-gradient-to-br from-green-500 to-emerald-600" : "bg-gradient-to-br from-amber-500 to-orange-600"}`}>
-                <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-                <div className="relative z-10 space-y-4">
-                    <motion.div
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        transition={{ type: "spring", bounce: 0.5, delay: 0.2 }}
-                    >
-                        {passed ? (
-                            <Sparkles className="h-20 w-20 mx-auto text-yellow-300" />
-                        ) : (
-                            <RotateCcw className="h-20 w-20 mx-auto text-white/80" />
-                        )}
-                    </motion.div>
-                    <h2 className="text-4xl font-extrabold">
-                        {passed ? "Brilliant!" : "Keep Practising!"}
-                    </h2>
-                    <p className="text-white/80 text-lg">
-                        You scored {correct} out of {totalQuestions} ({score}%)
-                    </p>
-                    {xpAwarded > 0 && (
-                        <motion.div
-                            initial={{ y: 20, opacity: 0 }}
-                            animate={{ y: 0, opacity: 1 }}
-                            transition={{ delay: 0.5 }}
-                            className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md px-5 py-2 rounded-full text-lg font-bold"
-                        >
-                            <Award className="h-5 w-5 text-yellow-300" /> +{xpAwarded} XP Earned!
-                        </motion.div>
-                    )}
-                </div>
-            </div>
+  const item = game.items[currentIdx]
+  if (!item) return null
 
-            {/* Answer Review */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
-                <h3 className="text-xl font-bold text-slate-800">Review Your Answers</h3>
-                <div className="space-y-3">
-                    {quiz.map((q, i) => {
-                        const wasCorrect = answers[i] === q.correctIndex
-                        return (
-                            <div key={i} className={`p-4 rounded-xl border ${wasCorrect ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
-                                <div className="flex items-start gap-3">
-                                    {wasCorrect ? (
-                                        <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5 shrink-0" />
-                                    ) : (
-                                        <XCircle className="h-5 w-5 text-red-500 mt-0.5 shrink-0" />
-                                    )}
-                                    <div>
-                                        <p className="font-bold text-slate-800">{q.question}</p>
-                                        {!wasCorrect && (
-                                            <p className="text-sm text-slate-600 mt-1">
-                                                Your answer: <span className="font-medium text-red-600">{q.options[answers[i]]}</span>
-                                                {" • "}
-                                                Correct: <span className="font-medium text-green-700">{q.options[q.correctIndex]}</span>
-                                            </p>
-                                        )}
-                                        <p className="text-sm text-slate-500 mt-1">{q.explanation}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        )
-                    })}
-                </div>
-            </div>
+  const options = [item.answer, ...(item.distractors || [])].sort(
+    () => Math.random() - 0.5
+  )
 
-            <div className="flex flex-col sm:flex-row justify-center gap-4">
-                {!passed && (
-                    <Button onClick={onRetry} size="lg" variant="outline" className="h-14 px-8 rounded-full font-bold text-lg border-2">
-                        <RotateCcw className="mr-2 h-5 w-5" /> Try Again
-                    </Button>
-                )}
-                <Link href="/student/lessons">
-                    <Button size="lg" className="h-14 px-8 rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-bold text-lg shadow-lg shadow-violet-200 transition-transform hover:scale-105">
-                        {passed ? "Next Lesson" : "Back to Curriculum"} <ChevronRight className="ml-2 h-5 w-5" />
-                    </Button>
-                </Link>
-            </div>
-        </motion.div>
-    )
+  const handleAnswer = (selected: string) => {
+    if (answered) return
+    setAnswered(true)
+    const correct = selected === item.answer
+    if (correct) setScore((s) => s + 1)
+
+    setTimeout(() => {
+      setAnswered(false)
+      if (currentIdx + 1 < game.items.length) {
+        setCurrentIdx((i) => i + 1)
+      } else {
+        onComplete(score + (correct ? 1 : 0))
+      }
+    }, 1000)
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="mx-auto max-w-lg space-y-4 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 p-5 text-white shadow-xl"
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-sm font-bold">
+          <Gamepad2 className="h-4 w-4" /> {game.title}
+        </div>
+        <span className="rounded-full bg-white/20 px-2 py-1 text-xs">
+          {currentIdx + 1}/{game.items.length}
+        </span>
+      </div>
+
+      <p className="py-4 text-center text-xl font-bold">{item.question}</p>
+
+      <div className="grid grid-cols-2 gap-2">
+        {options.map((opt, i) => (
+          <button
+            key={i}
+            onClick={() => handleAnswer(opt)}
+            disabled={answered}
+            className={`rounded-xl p-3 text-sm font-bold transition-all ${
+              answered && opt === item.answer
+                ? "bg-green-400 text-white"
+                : answered
+                  ? "bg-white/10 opacity-50"
+                  : "bg-white/20 hover:bg-white/30 active:scale-95"
+            }`}
+          >
+            {opt}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex justify-between pt-2 text-xs text-white/60">
+        <span>
+          Score: {score}/{game.items.length}
+        </span>
+        <span className="capitalize">{game.difficulty}</span>
+      </div>
+    </motion.div>
+  )
 }

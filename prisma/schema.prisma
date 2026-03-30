@@ -19,16 +19,29 @@ enum LessonStatus {
   COMPLETED
 }
 
+enum SessionPhase {
+  GREETING
+  TOPIC_SELECTION
+  TEACHING
+  CHECK
+  PRACTICE
+  RETEACH
+  QUIZ
+  GAME
+  RESULTS
+  WRAP_UP
+}
+
 // User (Parent or Admin)
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
-  password  String   // Hashed password
+  password  String
   name      String?
   role      Role     @default(PARENT)
-  
-  children  Student[]
-  
+
+  children Student[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -37,19 +50,91 @@ model User {
 model Student {
   id        String   @id @default(cuid())
   name      String
-  grade     String?  // e.g., "Year 3", "Year 4"
+  grade     String?
   xp        Int      @default(0)
-  avatar    String?  // URL to avatar image
-  
-  parentId  String
-  parent    User     @relation(fields: [parentId], references: [id], onDelete: Cascade)
-  
-  progress     LessonProgress[]
-  achievements Achievement[]
-  gameScores   GameScore[]
-  
+  avatar    String?
+  interests String[] @default([])
+
+  parentId String
+  parent   User   @relation(fields: [parentId], references: [id], onDelete: Cascade)
+
+  progress       LessonProgress[]
+  achievements   Achievement[]
+  gameScores     GameScore[]
+  tutorSessions  TutorSession[]
+  topicMastery   TopicMastery[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// AI Tutor Session - one per lesson sitting
+model TutorSession {
+  id        String       @id @default(cuid())
+  studentId String
+  student   Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  lessonId  String?
+  lesson    Lesson?      @relation(fields: [lessonId], references: [id], onDelete: SetNull)
+
+  phase     SessionPhase @default(GREETING)
+  topic     String?
+  bloomLevel Int         @default(1)
+
+  messages  TutorMessage[]
+
+  score       Int?
+  xpAwarded   Int       @default(0)
+  startedAt   DateTime  @default(now())
+  endedAt     DateTime?
+}
+
+// Individual messages in a tutor session
+model TutorMessage {
+  id        String       @id @default(cuid())
+  sessionId String
+  session   TutorSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  role      String       // user, assistant, system, tool
+  content   String
+  metadata  Json?        // tool calls, quiz data, game params, etc.
+
+  createdAt DateTime     @default(now())
+}
+
+// Per-topic mastery tracking
+model TopicMastery {
+  id         String  @id @default(cuid())
+  studentId  String
+  student    Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  topic      String
+  subject    String
+  bloomLevel Int     @default(1)
+  confidence Float   @default(0)
+  attempts   Int     @default(0)
+  correct    Int     @default(0)
+
+  lastPracticed DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([studentId, topic])
+}
+
+// RAG content embeddings
+model ContentEmbedding {
+  id        String                   @id @default(cuid())
+  content   String
+  embedding Unsupported("vector(1536)")?
+  source    String
+  topic     String
+  subject   String
+  keyStage  String
+  bloomLevel Int                     @default(1)
+
+  createdAt DateTime                 @default(now())
+
+  @@index([subject, keyStage])
 }
 
 // Curriculum - Subject
@@ -96,7 +181,8 @@ model Lesson {
   moduleId String
   module   Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
 
-  progress LessonProgress[]
+  progress      LessonProgress[]
+  tutorSessions TutorSession[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
