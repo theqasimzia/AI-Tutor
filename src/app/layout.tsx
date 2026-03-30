@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
-import { Outfit } from "next/font/google"; // Using Outfit as per "Premium Design" instructions
+import { Outfit } from "next/font/google";
 import "./globals.css";
 import { Navbar } from "@/components/navbar";
+import { SessionProvider } from "@/components/providers/session-provider";
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -22,10 +23,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${outfit.variable} font-sans antialiased bg-background text-foreground`}>
-        <Navbar />
-        <main className="min-h-screen flex flex-col">
-          {children}
-        </main>
+        <SessionProvider>
+          <Navbar />
+          <main className="min-h-screen flex flex-col">
+            {children}
+          </main>
+        </SessionProvider>
       </body>
     </html>
   );

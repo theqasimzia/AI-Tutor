@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
+import { signIn, useSession } from "next-auth/react"
 import { GraduationCap } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -14,18 +15,45 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 export default function LoginPage() {
     const router = useRouter()
     const [loading, setLoading] = useState(false)
+    const [error, setError] = useState("")
 
-    const handleLogin = (role: "student" | "parent") => {
+    const [studentEmail, setStudentEmail] = useState("")
+    const [studentPassword, setStudentPassword] = useState("")
+    const [parentEmail, setParentEmail] = useState("")
+    const [parentPassword, setParentPassword] = useState("")
+
+    const handleLogin = async (role: "student" | "parent") => {
         setLoading(true)
-        // Simulate login
-        setTimeout(() => {
-            setLoading(false)
-            if (role === "student") {
-                router.push("/student/dashboard")
-            } else {
-                router.push("/parent/dashboard")
+        setError("")
+
+        const email = role === "student" ? studentEmail : parentEmail
+        const password = role === "student" ? studentPassword : parentPassword
+
+        try {
+            const result = await signIn("credentials", {
+                email,
+                password,
+                redirect: false,
+            })
+
+            if (result?.error) {
+                setError("Invalid email or password. Please try again.")
+                setLoading(false)
+                return
             }
-        }, 1000)
+
+            if (result?.ok) {
+                if (role === "student") {
+                    router.push("/student/dashboard")
+                } else {
+                    router.push("/parent/dashboard")
+                }
+                router.refresh()
+            }
+        } catch {
+            setError("Something went wrong. Please try again.")
+            setLoading(false)
+        }
     }
 
     return (
@@ -42,7 +70,12 @@ export default function LoginPage() {
                 </CardDescription>
             </CardHeader>
             <CardContent>
-                <Tabs defaultValue="student" className="w-full">
+                {error && (
+                    <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-600">
+                        {error}
+                    </div>
+                )}
+                <Tabs defaultValue="student" className="w-full" onValueChange={() => setError("")}>
                     <TabsList className="grid w-full grid-cols-2 mb-4">
                         <TabsTrigger value="student">Student</TabsTrigger>
                         <TabsTrigger value="parent">Parent</TabsTrigger>
@@ -51,16 +84,32 @@ export default function LoginPage() {
                     <TabsContent value="student">
                         <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleLogin("student") }}>
                             <div className="space-y-2">
-                                <Label htmlFor="s-email">Student Email or Username</Label>
-                                <Input id="s-email" placeholder="student@example.com" required />
+                                <Label htmlFor="s-email">Parent Email</Label>
+                                <Input
+                                    id="s-email"
+                                    type="email"
+                                    placeholder="parent@example.com"
+                                    required
+                                    value={studentEmail}
+                                    onChange={(e) => setStudentEmail(e.target.value)}
+                                />
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="s-password">Password</Label>
-                                <Input id="s-password" type="password" required />
+                                <Input
+                                    id="s-password"
+                                    type="password"
+                                    required
+                                    value={studentPassword}
+                                    onChange={(e) => setStudentPassword(e.target.value)}
+                                />
                             </div>
                             <Button className="w-full" type="submit" disabled={loading}>
                                 {loading ? "Logging in..." : "Login as Student"}
                             </Button>
+                            <p className="text-xs text-muted-foreground text-center">
+                                Use your parent&apos;s email to access your student dashboard
+                            </p>
                         </form>
                     </TabsContent>
 
@@ -68,11 +117,24 @@ export default function LoginPage() {
                         <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleLogin("parent") }}>
                             <div className="space-y-2">
                                 <Label htmlFor="p-email">Parent Email</Label>
-                                <Input id="p-email" type="email" placeholder="parent@example.com" required />
+                                <Input
+                                    id="p-email"
+                                    type="email"
+                                    placeholder="parent@example.com"
+                                    required
+                                    value={parentEmail}
+                                    onChange={(e) => setParentEmail(e.target.value)}
+                                />
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="p-password">Password</Label>
-                                <Input id="p-password" type="password" required />
+                                <Input
+                                    id="p-password"
+                                    type="password"
+                                    required
+                                    value={parentPassword}
+                                    onChange={(e) => setParentPassword(e.target.value)}
+                                />
                             </div>
                             <Button className="w-full" type="submit" variant="secondary" disabled={loading}>
                                 {loading ? "Logging in..." : "Login as Parent"}

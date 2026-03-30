@@ -13,10 +13,12 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
 import { registerParent } from "@/app/actions/auth-actions"
 import { useRouter } from "next/navigation"
+import { signIn } from "next-auth/react"
 
 export default function ParentSignupPage() {
     const router = useRouter()
     const [isLoading, setIsLoading] = useState(false)
+    const [errorMessage, setErrorMessage] = useState("")
     const [step, setStep] = useState(1)
     const [formData, setFormData] = useState({
         parentName: "",
@@ -50,17 +52,29 @@ export default function ParentSignupPage() {
 
     const handleSubmit = async () => {
         setIsLoading(true)
+        setErrorMessage("")
         try {
             const result = await registerParent(formData)
             if (result.success) {
-                // Redirect to login or success page
-                router.push("/login?registered=true")
+                const signInResult = await signIn("credentials", {
+                    email: formData.email,
+                    password: formData.password,
+                    redirect: false,
+                })
+
+                if (signInResult?.error) {
+                    router.push("/login?registered=true")
+                    return
+                }
+
+                router.push("/parent/dashboard")
+                router.refresh()
             } else {
-                alert(result.message) // In a real app, use a toast
+                setErrorMessage(result.message)
             }
         } catch (error) {
             console.error(error)
-            alert("An error occurred. Please try again.")
+            setErrorMessage("An error occurred. Please try again.")
         } finally {
             setIsLoading(false)
         }
@@ -89,6 +103,14 @@ export default function ParentSignupPage() {
                         <AlertCircle className="h-4 w-4" />
                         Hurry! Only <span className="font-bold">258</span> early access spots remaining
                     </div>
+
+                    {errorMessage && (
+                        <Alert variant="destructive">
+                            <AlertCircle className="h-4 w-4" />
+                            <AlertTitle>Error</AlertTitle>
+                            <AlertDescription>{errorMessage}</AlertDescription>
+                        </Alert>
+                    )}
 
                     {/* Step Indicators */}
                     <div className="flex justify-between px-8 text-sm font-medium text-slate-500 mb-8 relative">

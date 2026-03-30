@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useState } from "react"
+import { useSession, signOut } from "next-auth/react"
 import {
     LayoutDashboard,
     Users,
@@ -30,6 +31,10 @@ export default function AdminLayout({
 }) {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false)
     const pathname = usePathname()
+    const { data: session } = useSession()
+
+    const userName = session?.user?.name || "Admin"
+    const initials = userName.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)
 
     return (
         <div className="min-h-screen bg-slate-100 flex font-sans">
@@ -86,12 +91,13 @@ export default function AdminLayout({
 
                 {/* Footer */}
                 <div className="p-4 border-t border-slate-800">
-                    <Link href="/login">
-                        <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-900 hover:text-red-400 transition-colors cursor-pointer">
-                            <LogOut className="h-4 w-4" />
-                            <span className="text-sm font-medium">Sign Out</span>
-                        </div>
-                    </Link>
+                    <button
+                        onClick={() => signOut({ callbackUrl: "/login" })}
+                        className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-900 hover:text-red-400 transition-colors cursor-pointer w-full"
+                    >
+                        <LogOut className="h-4 w-4" />
+                        <span className="text-sm font-medium">Sign Out</span>
+                    </button>
                 </div>
             </aside>
 
@@ -113,7 +119,7 @@ export default function AdminLayout({
 
                     <div className="flex items-center gap-4">
                         <div className="h-8 w-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-600">
-                            AD
+                            {initials}
                         </div>
                     </div>
                 </header>

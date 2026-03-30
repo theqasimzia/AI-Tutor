@@ -27,7 +27,6 @@ export async function registerParent(data: SignupData) {
 
         const hashedPassword = await bcrypt.hash(data.password, 10)
 
-        // Create User (Mock DB Transaction Simulation)
         const user = await prisma.user.create({
             data: {
                 name: data.parentName,
@@ -35,7 +34,7 @@ export async function registerParent(data: SignupData) {
                 password: hashedPassword,
                 role: "PARENT",
             },
-        }) as any // Cast for mock DB flexibility
+        })
 
         // Create students for each child
         if (data.children && data.children.length > 0) {

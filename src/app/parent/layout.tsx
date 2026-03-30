@@ -4,6 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useState } from "react"
 import { motion } from "framer-motion"
+import { useSession, signOut } from "next-auth/react"
 import {
     LayoutDashboard,
     Users,
@@ -33,6 +34,10 @@ export default function ParentLayout({
 }) {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false)
     const pathname = usePathname()
+    const { data: session } = useSession()
+
+    const userName = session?.user?.name || "Parent"
+    const initials = userName.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)
 
     return (
         <div className="min-h-screen bg-slate-50 flex font-sans">
@@ -91,19 +96,22 @@ export default function ParentLayout({
                 <div className="p-4 border-t border-slate-800 m-4 bg-slate-800/50 rounded-xl">
                     <div className="flex items-center gap-3 mb-3">
                         <div className="h-10 w-10 rounded-full bg-slate-700 border border-slate-600 flex items-center justify-center text-slate-300 font-bold">
-                            JD
+                            {initials}
                         </div>
                         <div className="overflow-hidden">
-                            <p className="text-sm font-bold text-white truncate">Jane Doe</p>
-                            <p className="text-xs text-slate-400">Premium Member</p>
+                            <p className="text-sm font-bold text-white truncate">{userName}</p>
+                            <p className="text-xs text-slate-400">Parent Account</p>
                         </div>
                     </div>
-                    <Link href="/login">
-                        <Button variant="ghost" size="sm" className="w-full justify-start gap-2 text-slate-400 hover:text-red-400 hover:bg-slate-800 transition-colors">
-                            <LogOut className="h-4 w-4" />
-                            Sign Out
-                        </Button>
-                    </Link>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full justify-start gap-2 text-slate-400 hover:text-red-400 hover:bg-slate-800 transition-colors"
+                        onClick={() => signOut({ callbackUrl: "/login" })}
+                    >
+                        <LogOut className="h-4 w-4" />
+                        Sign Out
+                    </Button>
                 </div>
             </aside>
 
