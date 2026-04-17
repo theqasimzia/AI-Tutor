@@ -6,9 +6,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { User, Lock, Bell, Sparkles } from "lucide-react"
+import { Sparkles, X, Plus } from "lucide-react"
 import { useStudent } from "@/lib/student-context"
-import { updateStudentProfile } from "@/app/actions/student-actions"
+import { updateStudentProfile, updateStudentInterests } from "@/app/actions/student-actions"
 import { toast } from "sonner"
 
 export default function ProfilePage() {
@@ -104,6 +104,11 @@ export default function ProfilePage() {
                             </div>
                         </CardContent>
                     </Card>
+
+                    <InterestsPicker
+                        studentId={selectedStudent?.id}
+                        initialInterests={selectedStudent?.interests ?? []}
+                    />
                 </TabsContent>
 
                 <TabsContent value="subscription" className="space-y-6">
@@ -135,6 +140,115 @@ export default function ProfilePage() {
                 </TabsContent>
             </Tabs>
         </div>
+    )
+}
+
+const SUGGESTED_INTERESTS = [
+    "dinosaurs", "space", "football", "minecraft", "animals",
+    "robots", "cooking", "drawing", "music", "superheroes",
+    "cars", "ocean", "harry potter", "lego", "science experiments",
+    "dancing", "pokemon", "nature", "coding", "swimming",
+]
+
+function InterestsPicker({ studentId, initialInterests }: { studentId?: string; initialInterests: string[] }) {
+    const [interests, setInterests] = useState<string[]>(initialInterests)
+    const [customInput, setCustomInput] = useState("")
+    const [saving, setSaving] = useState(false)
+
+    const toggleInterest = (interest: string) => {
+        setInterests((prev) =>
+            prev.includes(interest) ? prev.filter((i) => i !== interest) : prev.length < 10 ? [...prev, interest] : prev
+        )
+    }
+
+    const addCustom = () => {
+        const trimmed = customInput.trim().toLowerCase()
+        if (!trimmed || interests.includes(trimmed) || interests.length >= 10) return
+        setInterests((prev) => [...prev, trimmed])
+        setCustomInput("")
+    }
+
+    const handleSave = async () => {
+        if (!studentId) return
+        setSaving(true)
+        try {
+            await updateStudentInterests(studentId, interests)
+            toast.success("Interests updated! The AI tutor will use these to personalise lessons.")
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Failed to save")
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    const hasChanges = JSON.stringify(interests.sort()) !== JSON.stringify(initialInterests.sort())
+
+    return (
+        <Card className="border-violet-200 bg-gradient-to-br from-violet-50/50 to-white">
+            <CardHeader>
+                <div className="flex items-center gap-2">
+                    <Sparkles className="h-5 w-5 text-violet-600" />
+                    <CardTitle>My Interests</CardTitle>
+                </div>
+                <CardDescription>
+                    Tell us what you love! The AI tutor will weave your interests into lessons to make learning fun.
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                {interests.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                        {interests.map((interest) => (
+                            <span
+                                key={interest}
+                                className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-3 py-1.5 text-sm font-medium text-violet-700"
+                            >
+                                {interest}
+                                <button onClick={() => toggleInterest(interest)} className="ml-1 hover:text-violet-900">
+                                    <X className="h-3 w-3" />
+                                </button>
+                            </span>
+                        ))}
+                    </div>
+                )}
+
+                <div>
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Popular picks</p>
+                    <div className="flex flex-wrap gap-1.5">
+                        {SUGGESTED_INTERESTS.filter((s) => !interests.includes(s)).map((suggestion) => (
+                            <button
+                                key={suggestion}
+                                onClick={() => toggleInterest(suggestion)}
+                                className="rounded-full border border-slate-200 px-3 py-1 text-xs font-medium text-slate-600 hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 transition-colors"
+                            >
+                                + {suggestion}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="flex gap-2">
+                    <Input
+                        value={customInput}
+                        onChange={(e) => setCustomInput(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && addCustom()}
+                        placeholder="Add your own interest..."
+                        className="flex-1"
+                        maxLength={50}
+                    />
+                    <Button variant="outline" size="icon" onClick={addCustom} disabled={!customInput.trim()}>
+                        <Plus className="h-4 w-4" />
+                    </Button>
+                </div>
+
+                <p className="text-xs text-slate-400">{interests.length}/10 interests selected</p>
+
+                {hasChanges && (
+                    <Button onClick={handleSave} disabled={saving} className="bg-violet-600 hover:bg-violet-700">
+                        {saving ? "Saving..." : "Save Interests"}
+                    </Button>
+                )}
+            </CardContent>
+        </Card>
     )
 }
 

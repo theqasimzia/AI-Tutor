@@ -10,6 +10,7 @@ type StudentData = {
   grade: string | null
   xp: number
   avatar: string | null
+  interests: string[]
 }
 
 type StudentContextType = {

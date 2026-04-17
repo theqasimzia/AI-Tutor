@@ -46,6 +46,24 @@ export async function updateStudentProfile(
   })
 }
 
+export async function updateStudentInterests(
+  studentId: string,
+  interests: string[]
+) {
+  await requireParentOfStudent(studentId)
+
+  if (interests.length > 10) throw new Error("Maximum 10 interests allowed")
+
+  const cleaned = interests
+    .map((i) => i.trim().toLowerCase())
+    .filter((i) => i.length > 0 && i.length <= 50)
+
+  return prisma.student.update({
+    where: { id: studentId },
+    data: { interests: cleaned },
+  })
+}
+
 export async function startLesson(studentId: string, lessonId: string) {
   const parsed = startLessonSchema.safeParse({ studentId, lessonId })
   if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "Invalid input")

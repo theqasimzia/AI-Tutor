@@ -99,6 +99,24 @@ export default function StudentDashboard() {
                 </div>
             </div>
 
+            {/* Interests prompt for new students */}
+            {selectedStudent && (!selectedStudent.interests || selectedStudent.interests.length === 0) && (
+                <div className="flex items-center gap-4 rounded-2xl border border-violet-200 bg-gradient-to-r from-violet-50 to-indigo-50 p-5">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-violet-100">
+                        <Sparkles className="h-6 w-6 text-violet-600" />
+                    </div>
+                    <div className="flex-1">
+                        <p className="font-bold text-slate-800">Tell us what you love!</p>
+                        <p className="text-sm text-slate-500">Set your interests so the AI tutor can make lessons about things you enjoy.</p>
+                    </div>
+                    <Link href="/student/profile">
+                        <Button size="sm" className="rounded-full bg-violet-600 hover:bg-violet-700 font-bold">
+                            Set Interests
+                        </Button>
+                    </Link>
+                </div>
+            )}
+
             {/* Stats Grid */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
                 <StatsCard

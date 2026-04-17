@@ -6,7 +6,7 @@ import { LessonStatus } from "@prisma/client"
 export async function getStudentsByParentId(parentId: string) {
   return prisma.student.findMany({
     where: { parentId },
-    select: { id: true, name: true, grade: true, xp: true, avatar: true },
+    select: { id: true, name: true, grade: true, xp: true, avatar: true, interests: true },
     orderBy: { createdAt: "asc" },
   })
 }
